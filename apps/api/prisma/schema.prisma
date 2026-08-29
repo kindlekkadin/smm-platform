@@ -440,6 +440,12 @@ model ProviderOrderSubmission {
   externalStatus   String?
   status           ProviderSubmissionStatus @default(PENDING)
 
+  // Snapshot of providerServiceMapping.providerPricePerThousand * order.quantity
+  // / 1000, frozen at dispatch time — mirrors CreatorEarning's frozen-price
+  // pattern. Null if the mapping had no providerPricePerThousand configured
+  // (cost unknown). Never recomputed on retry.
+  cost Decimal? @db.Decimal(10, 2)
+
   attempts      Int       @default(0)
   lastAttemptAt DateTime?
   lastError     String?

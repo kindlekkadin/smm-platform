@@ -104,6 +104,12 @@ export default function DashboardPage() {
           >
             Admin: provider dispatch log
           </Link>
+          <Link
+            href="/admin/analytics"
+            className="rounded border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800"
+          >
+            Admin: analytics & financial reporting
+          </Link>
         </>
       )}
       <button

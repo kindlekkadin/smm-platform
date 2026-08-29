@@ -12,6 +12,7 @@ import { OrdersModule } from './orders/orders.module';
 import { PaymentsModule } from './payments/payments.module';
 import { CreatorsModule } from './creators/creators.module';
 import { ProvidersModule } from './providers/providers.module';
+import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   imports: [
@@ -26,6 +27,7 @@ import { ProvidersModule } from './providers/providers.module';
     PaymentsModule,
     CreatorsModule,
     ProvidersModule,
+    AnalyticsModule,
   ],
   controllers: [AppController, HealthController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],

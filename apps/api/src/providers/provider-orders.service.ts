@@ -4,6 +4,7 @@ import { PrismaService } from '../prisma/prisma.service';
 import { ProvidersService } from './providers.service';
 import { ProviderRegistry } from './adapters/provider-registry';
 import { DispatchOrderDto } from './dto/dispatch-order.dto';
+import { calculateEstimatedPrice } from '../services/pricing';
 
 const ACTIVE_SUBMISSION_STATUSES: ProviderSubmissionStatus[] = [
   ProviderSubmissionStatus.PENDING,
@@ -59,12 +60,20 @@ export class ProviderOrdersService {
       throw new BadRequestException(`This mapping allows a quantity of at most ${mapping.maxQuantity}`);
     }
 
+    // Frozen at dispatch time, never recomputed on retry — mirrors
+    // CreatorEarning's frozen-price pattern. Null if the mapping has no
+    // configured cost.
+    const cost = mapping.providerPricePerThousand
+      ? calculateEstimatedPrice(mapping.providerPricePerThousand, order.quantity)
+      : null;
+
     const submission = await this.prisma.providerOrderSubmission.create({
       data: {
         orderId: order.id,
         providerId: mapping.providerId,
         providerServiceMappingId: mapping.id,
         status: ProviderSubmissionStatus.PENDING,
+        cost,
       },
     });
 
