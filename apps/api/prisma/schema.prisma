@@ -1,0 +1,459 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+enum UserRole {
+  CUSTOMER
+  CREATOR
+  ADMIN
+}
+
+enum UserStatus {
+  ACTIVE
+  SUSPENDED
+  DELETED
+}
+
+model User {
+  id            String     @id @default(uuid())
+  email         String     @unique
+  passwordHash  String
+  displayName   String
+  role          UserRole
+  status        UserStatus @default(ACTIVE)
+  emailVerified Boolean    @default(false)
+  createdAt     DateTime   @default(now())
+  updatedAt     DateTime   @updatedAt
+  sessions      Session[]
+  socialAccounts SocialAccount[]
+  orders        Order[]
+  payments      Payment[]
+  creatorProfile CreatorProfile?
+}
+
+model Session {
+  id        String   @id @default(uuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  expiresAt DateTime
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+}
+
+enum SocialPlatform {
+  INSTAGRAM
+  TIKTOK
+  YOUTUBE
+  FACEBOOK
+  X
+  DEV_MOCK
+}
+
+enum SocialAccountStatus {
+  ACTIVE
+  DISCONNECTED
+}
+
+model SocialAccount {
+  id                String              @id @default(uuid())
+  userId            String
+  user              User                @relation(fields: [userId], references: [id], onDelete: Cascade)
+  platform          SocialPlatform
+  platformAccountId String
+  username          String
+  displayName       String?
+  profileImageUrl   String?
+  status            SocialAccountStatus @default(ACTIVE)
+  // Encrypted at rest (AES-256-GCM, see TokenCipherService). Never returned by any API response.
+  accessTokenSecret String?
+  connectedAt       DateTime            @default(now())
+  disconnectedAt    DateTime?
+  updatedAt         DateTime            @updatedAt
+  orders            Order[]
+
+  @@unique([userId, platform, platformAccountId])
+  @@index([userId])
+}
+
+enum ServiceCategory {
+  FOLLOWERS
+  LIKES
+  VIEWS
+  COMMENTS
+  ENGAGEMENT
+  OTHER
+}
+
+model Service {
+  id          String          @id @default(uuid())
+  name        String
+  slug        String          @unique
+  description String
+  category    ServiceCategory
+  platform    SocialPlatform
+
+  // Price per 1,000 units. Decimal (not float) to avoid floating-point rounding
+  // errors in money — this is what later phases' orders/pricing engine will read.
+  pricePerThousand Decimal    @db.Decimal(10, 2)
+  minQuantity      Int
+  maxQuantity      Int
+
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  orders    Order[]
+  creatorOfferings CreatorOffering[]
+  providerMappings ProviderServiceMapping[]
+
+  @@index([platform])
+  @@index([category])
+  @@index([active])
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  PROCESSING
+  COMPLETED
+  CANCELLED
+  FAILED
+}
+
+model Order {
+  id     String @id @default(uuid())
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  serviceId String
+  service   Service @relation(fields: [serviceId], references: [id])
+
+  socialAccountId String
+  socialAccount   SocialAccount @relation(fields: [socialAccountId], references: [id])
+
+  // Optional targeting info (e.g. a specific post URL) beyond "this connected account".
+  targetIdentifier String?
+
+  quantity Int
+
+  // Pricing snapshot at order-creation time — frozen so later Service price
+  // changes never alter an existing order's price. Never recompute a
+  // historical order's total from the live Service record.
+  unitPricePerThousand Decimal @db.Decimal(10, 2)
+  totalPrice           Decimal @db.Decimal(10, 2)
+
+  status    OrderStatus @default(PENDING)
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  payments  Payment[]
+  assignments OrderAssignment[]
+  providerSubmissions ProviderOrderSubmission[]
+
+  @@index([userId])
+  @@index([status])
+}
+
+// Only DEV_MOCK is implemented — no real provider has been selected yet and
+// no credentials exist in this environment. See payments/PAYMENT_PROVIDER_INTEGRATION.md
+// for what a real provider (Stripe/PayMongo/Xendit/etc.) requires to be added.
+enum PaymentProvider {
+  DEV_MOCK
+}
+
+enum PaymentStatus {
+  PENDING
+  SUCCEEDED
+  FAILED
+  REFUNDED
+}
+
+model Payment {
+  id      String @id @default(uuid())
+  orderId String
+  order   Order  @relation(fields: [orderId], references: [id])
+  userId  String
+  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  provider    PaymentProvider
+  // Opaque reference from the provider (session/intent id). For DEV_MOCK this
+  // is an unguessable generated id, not a real payment identifier.
+  providerRef String          @unique
+
+  // Snapshot of order.totalPrice at payment-initiation time — never derived
+  // from a client-supplied amount.
+  amount Decimal @db.Decimal(10, 2)
+
+  status        PaymentStatus @default(PENDING)
+  failureReason String?
+  refundReason  String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([userId])
+  @@index([orderId])
+  @@index([status])
+}
+
+// ---- Phase 6: Creator Marketplace ----
+// Schema only in this step — no controllers/services/business logic yet.
+
+enum CreatorVerificationStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  SUSPENDED
+}
+
+model CreatorProfile {
+  id     String @id @default(uuid())
+  userId String @unique
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  bio String?
+
+  verificationStatus CreatorVerificationStatus @default(PENDING)
+  appliedAt           DateTime                 @default(now())
+  reviewedAt          DateTime?
+  reviewedByAdminId   String?
+  rejectionReason     String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  offerings      CreatorOffering[]
+  assignments    OrderAssignment[]
+  earnings       CreatorEarning[]
+  payoutRequests PayoutRequest[]
+}
+
+enum CreatorOfferingStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model CreatorOffering {
+  id               String         @id @default(uuid())
+  creatorProfileId String
+  creatorProfile   CreatorProfile @relation(fields: [creatorProfileId], references: [id], onDelete: Cascade)
+  serviceId        String
+  service          Service        @relation(fields: [serviceId], references: [id])
+
+  // Creator's own quoted rate — independent of Service.pricePerThousand.
+  creatorPricePerThousand Decimal @db.Decimal(10, 2)
+  minQuantity             Int
+  maxQuantity             Int
+  notes                   String?
+
+  status CreatorOfferingStatus @default(PENDING)
+  active Boolean               @default(true)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  assignments OrderAssignment[]
+
+  @@unique([creatorProfileId, serviceId])
+  @@index([serviceId])
+  @@index([status])
+}
+
+enum AssignmentStatus {
+  OFFERED
+  ACCEPTED
+  COMPLETED
+  REJECTED
+  CANCELLED
+}
+
+model OrderAssignment {
+  id                String          @id @default(uuid())
+  orderId           String
+  order             Order           @relation(fields: [orderId], references: [id])
+  creatorProfileId  String
+  creatorProfile    CreatorProfile  @relation(fields: [creatorProfileId], references: [id])
+  creatorOfferingId String
+  creatorOffering   CreatorOffering @relation(fields: [creatorOfferingId], references: [id])
+
+  // Snapshot of CreatorOffering.creatorPricePerThousand at assignment time —
+  // frozen so a later CreatorOffering price change never alters an in-flight
+  // or historical assignment/earning. Combined with Order.quantity this is
+  // the sole input to CreatorEarning.amount.
+  creatorPricePerThousand Decimal @db.Decimal(10, 2)
+
+  status      AssignmentStatus @default(OFFERED)
+  assignedAt  DateTime         @default(now())
+  respondedAt DateTime?
+  completedAt DateTime?
+  cancelledAt DateTime?
+
+  rejectionReason    String?
+  cancellationReason String?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  earning CreatorEarning?
+
+  @@index([orderId])
+  @@index([creatorProfileId])
+  @@index([creatorOfferingId])
+  @@index([status])
+}
+
+model CreatorEarning {
+  id                String          @id @default(uuid())
+  creatorProfileId  String
+  creatorProfile    CreatorProfile  @relation(fields: [creatorProfileId], references: [id])
+  orderAssignmentId String          @unique
+  orderAssignment   OrderAssignment @relation(fields: [orderAssignmentId], references: [id])
+
+  // Immutable — computed once, at assignment completion, from the frozen
+  // OrderAssignment.creatorPricePerThousand. Never recalculated afterward.
+  amount Decimal @db.Decimal(10, 2)
+
+  payoutRequestId String?
+  payoutRequest   PayoutRequest? @relation(fields: [payoutRequestId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([creatorProfileId])
+  @@index([payoutRequestId])
+}
+
+enum PayoutRequestStatus {
+  PENDING
+  APPROVED
+  REJECTED
+  PAID
+}
+
+model PayoutRequest {
+  id               String         @id @default(uuid())
+  creatorProfileId String
+  creatorProfile   CreatorProfile @relation(fields: [creatorProfileId], references: [id])
+
+  // Sum of the CreatorEarning rows it covers, fixed at request time.
+  amount Decimal @db.Decimal(10, 2)
+
+  status      PayoutRequestStatus @default(PENDING)
+  requestedAt DateTime            @default(now())
+  reviewedAt  DateTime?
+  paidAt      DateTime?
+
+  rejectionReason String?
+  adminNotes      String?
+
+  earnings CreatorEarning[]
+
+  @@index([creatorProfileId])
+  @@index([status])
+}
+
+// ---- Phase 7: Provider / Fulfillment abstraction ----
+//
+// A second, independent fulfillment channel alongside Phase 6's creator
+// assignments — Order's customer-facing lifecycle (OrderStatus) is
+// unchanged. Only DEV_MOCK is implemented; no real automated fulfillment
+// API exists or is contacted. The mock provider never auto-reports
+// completion — see providers/dev-mock.provider.ts.
+
+enum ProviderStatus {
+  ACTIVE
+  INACTIVE
+  ERROR
+}
+
+model Provider {
+  id          String   @id @default(uuid())
+  name        String
+  code        String   @unique
+  apiEndpoint String?
+  // Encrypted at rest (AES-256-GCM, see TokenCipherService). Never returned by any API response.
+  apiKeySecret String?
+  isActive    Boolean  @default(true)
+  status      ProviderStatus @default(ACTIVE)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  serviceMappings ProviderServiceMapping[]
+  submissions     ProviderOrderSubmission[]
+}
+
+model ProviderServiceMapping {
+  id         String   @id @default(uuid())
+  providerId String
+  provider   Provider @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  serviceId  String
+  service    Service  @relation(fields: [serviceId], references: [id])
+
+  providerServiceId String
+
+  // Optional cost/quantity rules for this provider+service pairing. Distinct
+  // from Service.pricePerThousand (what the customer pays) and
+  // CreatorOffering.creatorPricePerThousand (what a human creator earns).
+  providerPricePerThousand Decimal? @db.Decimal(10, 2)
+  minQuantity              Int?
+  maxQuantity              Int?
+
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  submissions ProviderOrderSubmission[]
+
+  @@unique([providerId, serviceId])
+  @@index([serviceId])
+}
+
+enum ProviderSubmissionStatus {
+  PENDING
+  SUBMITTED
+  IN_PROGRESS
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+model ProviderOrderSubmission {
+  id         String   @id @default(uuid())
+  orderId    String
+  order      Order    @relation(fields: [orderId], references: [id])
+  providerId String
+  provider   Provider @relation(fields: [providerId], references: [id])
+
+  providerServiceMappingId String
+  providerServiceMapping   ProviderServiceMapping @relation(fields: [providerServiceMappingId], references: [id])
+
+  // External order reference once submitted — unguessable, from the provider.
+  providerOrderRef String? @unique
+  // Raw status string as last reported by the provider (for display/audit).
+  externalStatus   String?
+  status           ProviderSubmissionStatus @default(PENDING)
+
+  attempts      Int       @default(0)
+  lastAttemptAt DateTime?
+  lastError     String?
+  // Most recent raw request/response payload, for audit/debugging.
+  responseLog   Json?
+
+  submittedAt DateTime?
+  completedAt DateTime?
+  cancelledAt DateTime?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([orderId])
+  @@index([providerId])
+  @@index([status])
+}

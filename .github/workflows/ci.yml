@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# Cancel superseded runs on the same branch/PR so pushes don't queue up.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # Test-environment-only values consumed by apps/api. Nothing here is a
+  # real credential — Postgres/Redis are ephemeral service containers with
+  # no data or access worth protecting, and every provider integration in
+  # this codebase is DEV_MOCK-only (no real payment/social/fulfillment
+  # provider exists yet — see PAYMENT_PROVIDER_INTEGRATION.md and
+  # PROVIDER_INTEGRATION.md). If a real provider key is ever added, it must
+  # come from `${{ secrets.<NAME> }}` and never be inlined here like these.
+  NODE_ENV: test
+  DATABASE_URL: postgresql://smm:smm@localhost:5432/smm?schema=public
+  REDIS_URL: redis://localhost:6379
+  JWT_SECRET: ci-test-jwt-secret-not-used-outside-this-workflow
+  SOCIAL_TOKEN_ENCRYPTION_KEY: IdtD0rRKLiiW41vnSCLbBQNOYYTX0/8KIXjhsZNXU/I=
+  WEB_ORIGIN: http://localhost:3000
+  PORT: 3001
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_USER: smm
+          POSTGRES_PASSWORD: smm
+          POSTGRES_DB: smm
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U smm"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+      # Not consumed by any app code yet (grep confirms no REDIS_URL/BullMQ
+      # usage as of Phase 7) — provisioned now per .env.example's own note
+      # that it's reserved for a later background-jobs phase, so CI won't
+      # need a follow-up change when that phase lands.
+      redis:
+        image: redis:7
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "redis-cli ping"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 5
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: pnpm
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Generate Prisma client
+        run: pnpm --filter api exec prisma generate
+
+      - name: Run database migrations
+        run: pnpm --filter api exec prisma migrate deploy
+
+      - name: Typecheck API
+        run: pnpm --filter api run typecheck
+
+      - name: Typecheck web
+        run: pnpm --filter web run typecheck
+
+      - name: Run API unit tests
+        run: pnpm --filter api test
+
+      - name: Run API e2e tests
+        run: pnpm --filter api run test:e2e

@@ -1,0 +1,41 @@
+# Dependencies
+node_modules/
+
+# Env files — never commit real secrets/config. .env.example is the
+# committed template and is explicitly un-ignored below.
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Build outputs
+dist/
+build/
+out/
+.next/
+*.tsbuildinfo
+
+# Turborepo cache
+.turbo/
+
+# Test coverage
+coverage/
+
+# Logs
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+*.log
+
+# Editor/OS cruft
+.vscode/
+.idea/
+.DS_Store
+Thumbs.db
+
+# Vercel
+.vercel
+
+# Misc secrets
+*.pem
