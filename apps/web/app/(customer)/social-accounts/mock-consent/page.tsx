@@ -1,12 +1,20 @@
 'use client';
 
-import { FormEvent, useEffect, useState } from 'react';
+import { FormEvent, Suspense, useEffect, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth-context';
 import { ApiError } from '../../../../lib/api';
 import { completeConnection } from '../../../../lib/social-accounts-api';
 
 export default function MockConsentPage() {
+  return (
+    <Suspense fallback={null}>
+      <MockConsentForm />
+    </Suspense>
+  );
+}
+
+function MockConsentForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { user, loading: authLoading } = useAuth();
