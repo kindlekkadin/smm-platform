@@ -52,15 +52,16 @@ I have not committed or pushed these — say the word when you want that done, s
 
 1. In the Render dashboard: **New → Blueprint**.
 2. Connect the `smm-platform` GitHub repo. Render will detect `render.yaml` at the repo root and show a plan: one Postgres database (`smm-staging-postgres`) and one Docker web service (`smm-staging-api`).
-3. Click through to create them. Render will start building the API image immediately using `apps/api/Dockerfile` with the repo root as build context — this is the exact build I already verified locally.
-4. Two env vars on `smm-staging-api` need a manual value before the service can start (they're intentionally *not* auto-generated — see the table above):
+3. Click through to create them. `render.yaml` uses Render's **free** plan for both services — no card required, but two tradeoffs worth knowing going in: the web service spins down after ~15 minutes idle and cold-starts (10s+) on the next request, and the free Postgres instance is auto-deleted after 90 days. Fine for evaluating staging deployability; revisit the plan before either of these needs to stay reliably up.
+4. Render will start building the API image immediately using `apps/api/Dockerfile` with the repo root as build context — this is the exact build I already verified locally.
+5. Two env vars on `smm-staging-api` need a manual value before the service can start (they're intentionally *not* auto-generated — see the table above):
    - `SOCIAL_TOKEN_ENCRYPTION_KEY` — generate one locally and paste it in:
      ```bash
      node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
      ```
    - `WEB_ORIGIN` — leave a placeholder (`https://placeholder.example`) for now; you'll come back and fix this in Step 4 once the Vercel URL exists.
-5. Wait for the deploy to go green. Render's health check hits `/health/ready` — if that passes, the API is live and reaching Postgres.
-6. Copy the API's public URL (something like `https://smm-staging-api.onrender.com`) — you'll need it in Step 3.
+6. Wait for the deploy to go green. Render's health check hits `/health/ready` — if that passes, the API is live and reaching Postgres. On the free plan the first request after any idle period will be slow (cold start) — that's expected, not a failure.
+7. Copy the API's public URL (something like `https://smm-staging-api.onrender.com`) — you'll need it in Step 3.
 
 ## Step 3 — Deploy the web app on Vercel
 

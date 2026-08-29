@@ -11,7 +11,10 @@
 
 databases:
   - name: smm-staging-postgres
-    plan: starter
+    # Free tier — no card required, but Render auto-deletes free Postgres
+    # instances after 90 days. Fine for evaluating staging deployability;
+    # revisit before this needs to stay up for real.
+    plan: free
     databaseName: smm
     user: smm
 
@@ -21,7 +24,10 @@ services:
     runtime: docker
     dockerfilePath: ./apps/api/Dockerfile
     dockerContext: .
-    plan: starter
+    # Free tier — no card required, but the instance spins down after
+    # ~15 minutes idle and cold-starts (10s+) on the next request. Fine for
+    # staging; not what you want for anything latency-sensitive.
+    plan: free
     healthCheckPath: /health/ready
     envVars:
       - key: DATABASE_URL
