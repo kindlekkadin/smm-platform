@@ -159,6 +159,10 @@ model Order {
 
   @@index([userId])
   @@index([status])
+  // Analytics filters by date range and by service, and virtually every
+  // admin listing sorts by createdAt — neither was indexed.
+  @@index([createdAt])
+  @@index([serviceId])
 }
 
 // Only DEV_MOCK is implemented — no real provider has been selected yet and

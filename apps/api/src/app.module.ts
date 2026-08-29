@@ -1,6 +1,8 @@
 import { Module } from '@nestjs/common';
 import { APP_GUARD } from '@nestjs/core';
 import { ThrottlerGuard, ThrottlerModule } from '@nestjs/throttler';
+import { LoggerModule } from 'nestjs-pino';
+import { randomUUID } from 'node:crypto';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
@@ -16,6 +18,31 @@ import { AnalyticsModule } from './analytics/analytics.module';
 
 @Module({
   imports: [
+    LoggerModule.forRoot({
+      pinoHttp: {
+        level: process.env.LOG_LEVEL ?? 'info',
+        // Pretty-printing spawns a worker thread via pino.transport() —
+        // fine for a human watching a local terminal, but a real risk of
+        // leaked handles/flaky teardown under Jest and unnecessary noise in
+        // production. Only ever enabled for an actual local dev run (NODE_ENV
+        // unset or explicitly 'development'), never 'test' or 'production'.
+        transport:
+          process.env.NODE_ENV !== 'test' && process.env.NODE_ENV !== 'production'
+            ? { target: 'pino-pretty', options: { colorize: true, singleLine: true } }
+            : undefined,
+        genReqId: (req) => req.headers['x-request-id'] ?? randomUUID(),
+        // Never let a cookie, bearer token, or password reach the logs.
+        redact: {
+          paths: [
+            'req.headers.cookie',
+            'req.headers.authorization',
+            'req.body.password',
+            'res.headers["set-cookie"]',
+          ],
+          censor: '[REDACTED]',
+        },
+      },
+    }),
     // Global default: 100 requests/minute per IP. Individual routes (auth,
     // webhooks) tighten this further with their own @Throttle() override.
     ThrottlerModule.forRoot([{ name: 'default', ttl: 60_000, limit: 100 }]),

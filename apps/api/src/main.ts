@@ -3,12 +3,16 @@ import cookieParser from 'cookie-parser';
 import helmet from 'helmet';
 import { ValidationPipe } from '@nestjs/common';
 import { NestFactory } from '@nestjs/core';
+import { Logger } from 'nestjs-pino';
 import { AppModule } from './app.module';
 
 async function bootstrap() {
   // rawBody is needed so payment-webhook signature verification (real
   // providers) can hash the exact bytes received, not a re-serialized copy.
-  const app = await NestFactory.create(AppModule, { rawBody: true });
+  // bufferLogs holds Nest's own startup logs until the pino logger below is
+  // attached, so nothing is lost or falls back to the default console format.
+  const app = await NestFactory.create(AppModule, { rawBody: true, bufferLogs: true });
+  app.useLogger(app.get(Logger));
 
   app.use(helmet());
   app.use(cookieParser());
