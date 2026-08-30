@@ -87,6 +87,16 @@ jobs:
       - name: Typecheck web
         run: pnpm --filter web run typecheck
 
+      - name: Build API (production)
+        run: pnpm --filter api run build
+
+      # A real `next build` catches things typecheck alone doesn't — e.g. a
+      # missing Suspense boundary around useSearchParams() only fails here,
+      # during static prerendering, not in `tsc` or `next dev`. That gap is
+      # exactly what let a broken staging deploy through once already.
+      - name: Build web (production)
+        run: pnpm --filter web run build
+
       - name: Run API unit tests
         run: pnpm --filter api test
 
