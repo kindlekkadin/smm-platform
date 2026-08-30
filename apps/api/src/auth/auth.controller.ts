@@ -21,6 +21,30 @@ const AUTH_THROTTLE = {
   default: { limit: process.env.NODE_ENV === 'test' ? 1000 : 5, ttl: 60_000 },
 };
 
+// The frontend and API are deployed on different sites (e.g. *.vercel.app
+// vs *.onrender.com), so every request between them is cross-site from the
+// cookie's perspective. SameSite=Lax is never attached to a cross-site
+// fetch/XHR (only to top-level navigations), so in that environment login
+// would appear to succeed but every subsequent request — including the
+// post-login /api/auth/me refresh — silently loses the session, bouncing
+// the user straight back to /login. SameSite=None fixes that, at the cost
+// of removing this app's only CSRF protection (CORS does not prevent a
+// plain cross-site <form> POST from carrying this cookie). Acceptable for
+// now — this environment has no real payment/user data — but revisit
+// before any real-production use: a custom domain that puts both apps on
+// the same site, Bearer-token auth, or real CSRF tokens.
+const IS_CROSS_SITE_DEPLOYMENT = process.env.NODE_ENV === 'production';
+const SESSION_COOKIE_OPTIONS = {
+  httpOnly: true,
+  sameSite: (IS_CROSS_SITE_DEPLOYMENT ? 'none' : 'lax') as 'none' | 'lax',
+  // A SameSite=None cookie is rejected outright by browsers unless also
+  // Secure, and Secure cookies are refused over plain HTTP — exactly what
+  // local dev (http://localhost) is — so this must track NODE_ENV rather
+  // than being hardcoded either way.
+  secure: IS_CROSS_SITE_DEPLOYMENT,
+  path: '/',
+};
+
 @Controller('api/auth')
 export class AuthController {
   constructor(private readonly authService: AuthService) {}
@@ -39,13 +63,7 @@ export class AuthController {
     const { user, token } = await this.authService.login(dto);
 
     res.cookie(ACCESS_TOKEN_COOKIE, token, {
-      httpOnly: true,
-      sameSite: 'lax',
-      // Real browsers refuse a `secure` cookie over plain HTTP, which is
-      // exactly what local dev (http://localhost) is — so this must track
-      // NODE_ENV rather than being hardcoded either way.
-      secure: process.env.NODE_ENV === 'production',
-      path: '/',
+      ...SESSION_COOKIE_OPTIONS,
       maxAge: SESSION_TTL_SECONDS * 1000,
     });
 
@@ -60,7 +78,10 @@ export class AuthController {
     @Res({ passthrough: true }) res: Response,
   ) {
     await this.authService.logout(user.sessionId);
-    res.clearCookie(ACCESS_TOKEN_COOKIE, { path: '/' });
+    // clearCookie must be called with the same attributes the cookie was
+    // set with, or some browsers won't recognize it as the same cookie to
+    // remove and it lingers past logout.
+    res.clearCookie(ACCESS_TOKEN_COOKIE, SESSION_COOKIE_OPTIONS);
     return { success: true };
   }
 
