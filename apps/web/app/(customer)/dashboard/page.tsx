@@ -5,7 +5,9 @@ import Link from 'next/link';
 import { useAuth } from '../../../lib/auth-context';
 import { ApiError } from '../../../lib/api';
 import { Order, listOrders } from '../../../lib/orders-api';
+import { Service } from '../../../lib/services-api';
 import StatsRow from '../../../components/StatsRow';
+import OrderForm from '../../../components/OrderForm';
 
 function ActionCard({ href, title, sub, tone = 'default' }: { href: string; title: string; sub?: string; tone?: 'default' | 'primary' | 'accent' }) {
   const toneClasses =
@@ -38,10 +40,58 @@ function Section({ label, children }: { label: string; children: React.ReactNode
   );
 }
 
+function ServicePanel({ service }: { service: Service | null }) {
+  if (!service) {
+    return (
+      <>
+        <h2 className="text-sm font-semibold">Service Description &amp; Rules</h2>
+        <p className="mt-2 text-xs text-muted-foreground">
+          Pick a category and service on the left to see its details here.
+        </p>
+        <ul className="mt-3 list-disc space-y-2 pl-4 text-xs text-muted-foreground">
+          <li>Every service is fulfilled by a real, verified person — no bots, ever.</li>
+          <li>Double-check your link before submitting — orders can&apos;t be edited afterward.</li>
+          <li>Orders begin processing once payment is confirmed.</li>
+        </ul>
+      </>
+    );
+  }
+
+  return (
+    <>
+      <h2 className="text-sm font-semibold">{service.name}</h2>
+      <p className="mt-1 text-xs text-muted-foreground">{service.description}</p>
+      <div className="mt-3 space-y-1.5 text-xs">
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Platform</span>
+          <span className="font-medium">{service.platform}</span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">{service.pricingModel === 'FLAT' ? 'Packages' : 'Units'}</span>
+          <span className="font-medium">
+            {service.minQuantity.toLocaleString()}–{service.maxQuantity.toLocaleString()}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Price</span>
+          <span className="font-medium">
+            {service.pricingModel === 'FLAT' ? `${service.flatPrice}/package` : `${service.pricePerThousand}/1,000`}
+          </span>
+        </div>
+        <div className="flex justify-between">
+          <span className="text-muted-foreground">Average Time</span>
+          <span className="font-medium">{service.estimatedDelivery ?? 'Varies'}</span>
+        </div>
+      </div>
+    </>
+  );
+}
+
 export default function DashboardPage() {
   const { user } = useAuth();
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [loading, setLoading] = useState(true);
+  const [selectedService, setSelectedService] = useState<Service | null>(null);
 
   useEffect(() => {
     listOrders()
@@ -68,9 +118,17 @@ export default function DashboardPage() {
 
       <StatsRow orders={orders} loading={loading} />
 
+      <div className="grid grid-cols-1 gap-6 lg:grid-cols-[1fr_320px]">
+        <OrderForm showInlineDetails={false} onServiceChange={setSelectedService} />
+
+        <aside className="h-fit rounded-xl border border-border bg-card p-5 shadow-warm lg:sticky lg:top-20">
+          <ServicePanel service={selectedService} />
+        </aside>
+      </div>
+
       <Section label="Your account">
-        <ActionCard href="/orders/new" title="New order" sub="Growth services and organic packages" tone="primary" />
         <ActionCard href="/social-accounts" title="Manage social accounts" sub="Connect and review linked accounts" />
+        <ActionCard href="/support" title="Support" sub="Order rules and account help" />
       </Section>
 
       {user.role === 'CREATOR' && (

@@ -1,0 +1,299 @@
+'use client';
+
+import { useEffect, useMemo, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import Link from 'next/link';
+import { ApiError } from '../lib/api';
+import { EstimateResult, Service, ServiceCategory, estimatePrice, listServices } from '../lib/services-api';
+import { SocialAccount, listSocialAccounts } from '../lib/social-accounts-api';
+import { createOrder } from '../lib/orders-api';
+
+const CATEGORY_ORDER: ServiceCategory[] = [
+  'FOLLOWERS',
+  'LIKES',
+  'VIEWS',
+  'COMMENTS',
+  'ENGAGEMENT',
+  'UGC_CONTENT',
+  'SHOUTOUT',
+  'AD_CAMPAIGN',
+  'OTHER',
+];
+
+export const CATEGORY_LABELS: Record<ServiceCategory, string> = {
+  FOLLOWERS: 'Social Growth — Followers',
+  LIKES: 'Social Growth — Likes',
+  VIEWS: 'Social Growth — Views',
+  COMMENTS: 'Social Growth — Comments',
+  ENGAGEMENT: 'Social Growth — Engagement',
+  UGC_CONTENT: 'UGC Content',
+  SHOUTOUT: 'Creator Shoutouts',
+  AD_CAMPAIGN: 'Sponsored Posts',
+  OTHER: 'Other',
+};
+
+interface OrderFormProps {
+  // When false, the inline description/min-max/average-time box is omitted —
+  // for pages that show that information in their own side panel instead.
+  showInlineDetails?: boolean;
+  // Lets the parent page track the selected service, e.g. to render it in
+  // its own side panel.
+  onServiceChange?: (service: Service | null) => void;
+}
+
+export default function OrderForm({ showInlineDetails = true, onServiceChange }: OrderFormProps) {
+  const router = useRouter();
+
+  const [services, setServices] = useState<Service[] | null>(null);
+  const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [loadError, setLoadError] = useState<string | null>(null);
+
+  const [categoryValue, setCategoryValue] = useState('');
+  const [serviceId, setServiceId] = useState('');
+  const [targetIdentifier, setTargetIdentifier] = useState('');
+  const [quantity, setQuantity] = useState<number>(0);
+  const [socialAccountId, setSocialAccountId] = useState('');
+
+  const [estimate, setEstimate] = useState<EstimateResult | null>(null);
+  const [estimating, setEstimating] = useState(false);
+  const [formError, setFormError] = useState<string | null>(null);
+  const [submitting, setSubmitting] = useState(false);
+
+  useEffect(() => {
+    setLoading(true);
+    listServices()
+      .then(({ services }) => setServices(services))
+      .catch((err) => setLoadError(err instanceof ApiError ? err.message : 'Failed to load services.'))
+      .finally(() => setLoading(false));
+
+    void listSocialAccounts()
+      .then(({ accounts }) => setSocialAccounts(accounts))
+      .catch(() => setSocialAccounts([]));
+  }, []);
+
+  const categories = useMemo(() => {
+    if (!services) return [];
+    return CATEGORY_ORDER.filter((c) => services.some((s) => s.category === c));
+  }, [services]);
+
+  const categoryServices = useMemo(
+    () => (services && categoryValue ? services.filter((s) => s.category === categoryValue) : []),
+    [services, categoryValue],
+  );
+
+  const selectedService = useMemo(
+    () => services?.find((s) => s.id === serviceId) ?? null,
+    [services, serviceId],
+  );
+
+  useEffect(() => {
+    onServiceChange?.(selectedService);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedService]);
+
+  const matchingAccounts = useMemo(
+    () =>
+      selectedService
+        ? socialAccounts.filter((a) => a.platform === selectedService.platform && a.status === 'ACTIVE')
+        : [],
+    [selectedService, socialAccounts],
+  );
+
+  function handleCategoryChange(value: string) {
+    setCategoryValue(value);
+    setServiceId('');
+    setEstimate(null);
+    setTargetIdentifier('');
+  }
+
+  function handleServiceChange(id: string) {
+    setServiceId(id);
+    setEstimate(null);
+    setFormError(null);
+    const service = services?.find((s) => s.id === id);
+    if (service) {
+      setQuantity(service.minQuantity);
+      const matches = socialAccounts.filter((a) => a.platform === service.platform && a.status === 'ACTIVE');
+      setSocialAccountId(matches[0]?.id ?? '');
+    }
+  }
+
+  // Dynamic pricing: recompute from the server whenever the selected service
+  // or quantity changes, debounced so we're not firing on every keystroke.
+  useEffect(() => {
+    if (!selectedService || quantity <= 0) {
+      setEstimate(null);
+      return;
+    }
+    setEstimating(true);
+    const timer = setTimeout(() => {
+      estimatePrice(selectedService.id, quantity)
+        .then(setEstimate)
+        .catch(() => setEstimate(null))
+        .finally(() => setEstimating(false));
+    }, 300);
+    return () => clearTimeout(timer);
+  }, [selectedService, quantity]);
+
+  async function handleSubmit() {
+    if (!selectedService) return;
+    setFormError(null);
+    setSubmitting(true);
+    try {
+      const { order } = await createOrder({
+        serviceId: selectedService.id,
+        socialAccountId,
+        quantity,
+        targetIdentifier: targetIdentifier || undefined,
+      });
+      router.push(`/orders/${order.id}`);
+    } catch (err) {
+      setFormError(err instanceof ApiError ? err.message : 'Failed to create order.');
+      setSubmitting(false);
+    }
+  }
+
+  const quantityLabel = selectedService?.pricingModel === 'FLAT' ? 'Quantity (packages)' : 'Quantity';
+
+  return (
+    <div className="space-y-4 rounded-xl border border-border bg-card p-5 shadow-warm">
+      {loadError && (
+        <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{loadError}</p>
+      )}
+
+      {loading ? (
+        <p className="text-sm text-muted-foreground">Loading services…</p>
+      ) : (
+        <>
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Category</label>
+            <select
+              value={categoryValue}
+              onChange={(e) => handleCategoryChange(e.target.value)}
+              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+            >
+              <option value="">Select a category…</option>
+              {categories.map((c) => (
+                <option key={c} value={c}>
+                  {CATEGORY_LABELS[c]}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          <div className="space-y-1">
+            <label className="text-xs font-medium text-muted-foreground">Service</label>
+            <select
+              value={serviceId}
+              onChange={(e) => handleServiceChange(e.target.value)}
+              disabled={!categoryValue}
+              className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm disabled:opacity-50"
+            >
+              <option value="">{categoryValue ? 'Select a service…' : 'Choose a category first'}</option>
+              {categoryServices.map((s) => (
+                <option key={s.id} value={s.id}>
+                  {s.name} — {s.pricingModel === 'FLAT' ? `${s.flatPrice}/package` : `${s.pricePerThousand}/1,000`}
+                </option>
+              ))}
+            </select>
+          </div>
+
+          {selectedService && (
+            <>
+              {showInlineDetails && (
+                <div className="rounded-xl border border-border bg-muted p-3 text-xs text-muted-foreground">
+                  <p className="text-sm font-medium text-foreground">{selectedService.name}</p>
+                  <p className="mt-1">{selectedService.description}</p>
+                  <p className="mt-1">
+                    {selectedService.minQuantity.toLocaleString()}–
+                    {selectedService.maxQuantity.toLocaleString()}{' '}
+                    {selectedService.pricingModel === 'FLAT' ? 'packages' : 'units'} · {selectedService.platform}
+                  </p>
+                </div>
+              )}
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-muted-foreground">Link / URL</label>
+                <input
+                  type="text"
+                  value={targetIdentifier}
+                  onChange={(e) => setTargetIdentifier(e.target.value)}
+                  placeholder="https://…"
+                  className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                />
+              </div>
+
+              <div className={showInlineDetails ? 'grid grid-cols-2 gap-3' : ''}>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">{quantityLabel}</label>
+                  <input
+                    type="number"
+                    min={selectedService.minQuantity}
+                    max={selectedService.maxQuantity}
+                    value={quantity}
+                    onChange={(e) => setQuantity(Number(e.target.value))}
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                  />
+                  <p className="text-[11px] text-muted-foreground">
+                    {selectedService.minQuantity.toLocaleString()}–{selectedService.maxQuantity.toLocaleString()}
+                  </p>
+                </div>
+                {showInlineDetails && (
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-muted-foreground">Average Time</label>
+                    <p className="rounded-xl border border-border bg-background px-3 py-2 text-sm text-muted-foreground">
+                      {selectedService.estimatedDelivery ?? 'Varies'}
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              {matchingAccounts.length > 0 ? (
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-muted-foreground">Account</label>
+                  <select
+                    value={socialAccountId}
+                    onChange={(e) => setSocialAccountId(e.target.value)}
+                    className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
+                  >
+                    {matchingAccounts.map((account) => (
+                      <option key={account.id} value={account.id}>
+                        @{account.username}
+                        {account.platform === 'DEV_MOCK' ? ' (dev mock)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              ) : (
+                <p className="rounded-xl border border-border bg-muted px-3 py-2 text-xs text-muted-foreground">
+                  Connect a {selectedService.platform} account to order this.{' '}
+                  <Link href="/social-accounts" className="font-medium underline">
+                    Connect account
+                  </Link>
+                </p>
+              )}
+
+              <div className="flex items-center justify-between rounded-xl border border-border bg-muted px-3 py-2.5">
+                <span className="text-sm font-medium">Total Charge</span>
+                <span className="text-lg font-semibold">
+                  {estimating ? '…' : estimate ? estimate.estimatedPrice : '—'}
+                </span>
+              </div>
+
+              {formError && <p className="text-xs text-red-600">{formError}</p>}
+
+              <button
+                onClick={() => void handleSubmit()}
+                disabled={submitting || matchingAccounts.length === 0 || quantity <= 0}
+                className="w-full rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground shadow-warm transition-all hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-50"
+              >
+                {submitting ? 'Placing order…' : 'Submit Order'}
+              </button>
+            </>
+          )}
+        </>
+      )}
+    </div>
+  );
+}
