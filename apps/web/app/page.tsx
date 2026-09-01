@@ -31,8 +31,16 @@ const BENEFITS = [
 
 const FAQS = [
   {
+    q: 'What is an SMM Panel?',
+    a: 'An SMM (social media marketing) panel is a dashboard where you order social media growth services — followers, likes, views, and more. A lot of panels resell bulk automated engagement; Hayathmanager doesn’t. Every order here is filled by a real person or a genuine growth channel.',
+  },
+  {
     q: 'Is this real engagement?',
     a: 'Yes. Every service is fulfilled by a real, verified person or a genuine growth channel. We don’t sell bots, fake accounts, or automated fake engagement — that’s a permanent rule of this platform, not a marketing line.',
+  },
+  {
+    q: 'What types of SMM services can I find on your panel?',
+    a: 'Real growth services — followers, likes, views, comments, and engagement — priced per 1,000 units, plus organic creator packages like UGC videos, shoutouts, and sponsored posts, priced per package.',
   },
   {
     q: 'How does pricing work?',
@@ -43,13 +51,45 @@ const FAQS = [
     a: 'Instagram, TikTok, YouTube, Facebook, and X today.',
   },
   {
-    q: 'Can I get an API key?',
-    a: 'Not yet. Every order currently goes through the dashboard, the same for everyone.',
+    q: 'What is the average order completion time?',
+    a: 'There’s no single platform-wide number — it depends entirely on the service. Each one lists its own estimated turnaround (Average Time) before you order.',
   },
   {
-    q: 'How fast is delivery?',
-    a: 'It varies by service — each one lists an estimated turnaround before you order.',
+    q: 'How quickly will my order be completed?',
+    a: 'Once your payment is confirmed, your order is handed off to a real person for fulfillment, so timing follows that service’s listed Average Time rather than a fixed guarantee.',
   },
+  {
+    q: 'How long does a paid order stay in the queue?',
+    a: 'There’s no fixed queue SLA today — timing depends on the service and, for organic packages, on creator availability. Check the Average Time on the service you’re ordering for the best estimate.',
+  },
+  {
+    q: 'Do you offer API support?',
+    a: 'Not yet. Every order currently goes through the dashboard, the same for everyone — see the API page for the honest current state.',
+  },
+  {
+    q: 'Will my money be returned to my balance if an order is cancelled?',
+    a: 'There’s no account balance to refund into — that feature doesn’t exist yet. You can cancel any order yourself for free before you pay; once paid, cancellation isn’t self-service, and refunds are handled manually by an admin case by case. See our Refund Policy for the full picture.',
+  },
+];
+
+const PLATFORM_SERVICE_COLUMNS: { platform: 'INSTAGRAM' | 'TIKTOK' | 'YOUTUBE' | 'FACEBOOK' | 'X'; label: string }[] = [
+  { platform: 'INSTAGRAM', label: 'Instagram' },
+  { platform: 'TIKTOK', label: 'TikTok' },
+  { platform: 'YOUTUBE', label: 'YouTube' },
+  { platform: 'FACEBOOK', label: 'Facebook' },
+  { platform: 'X', label: 'X (Twitter)' },
+];
+
+// FOLLOWERS/LIKES/VIEWS/COMMENTS/ENGAGEMENT are the real ServiceCategory
+// values this app supports — there's no "Shares" category in the schema, so
+// Engagement stands in for it rather than linking to something that doesn't
+// exist.
+const SERVICE_CATEGORY_LINKS: { category: 'FOLLOWERS' | 'LIKES' | 'VIEWS' | 'COMMENTS' | 'ENGAGEMENT'; label: string }[] = [
+  { category: 'FOLLOWERS', label: 'Followers' },
+  { category: 'LIKES', label: 'Likes' },
+  { category: 'VIEWS', label: 'Views' },
+  { category: 'COMMENTS', label: 'Comments' },
+  { category: 'ENGAGEMENT', label: 'Engagement' },
 ];
 
 function StatItem({ label, value }: { label: string; value: string }) {
@@ -318,7 +358,7 @@ export default function Home() {
       </section>
 
       {/* FAQ */}
-      <section className="mx-auto max-w-3xl px-4 py-14 sm:px-6">
+      <section id="faq" className="mx-auto max-w-3xl px-4 py-14 sm:px-6">
         <h2 className="text-center text-2xl font-semibold tracking-tight">Frequently asked questions</h2>
         <div className="mt-8 space-y-3">
           {FAQS.map((f) => (
@@ -330,7 +370,25 @@ export default function Home() {
       {/* Footer */}
       <footer className="border-t border-border bg-card">
         <div className="mx-auto max-w-6xl px-4 py-10 sm:px-6">
-          <div className="grid grid-cols-2 gap-8 sm:grid-cols-4">
+          <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Popular services</p>
+          <div className="mt-4 grid grid-cols-2 gap-6 sm:grid-cols-5">
+            {PLATFORM_SERVICE_COLUMNS.map((col) => (
+              <div key={col.platform}>
+                <p className="text-sm font-semibold">{col.label}</p>
+                <ul className="mt-2 space-y-1.5 text-sm text-muted-foreground">
+                  {SERVICE_CATEGORY_LINKS.map((cat) => (
+                    <li key={cat.category}>
+                      <Link href={`/services?platform=${col.platform}&category=${cat.category}`} className="hover:underline">
+                        {col.label} {cat.label}
+                      </Link>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+          </div>
+
+          <div className="mt-10 grid grid-cols-2 gap-8 border-t border-border pt-8 sm:grid-cols-4">
             <div className="col-span-2 sm:col-span-1">
               <div className="flex items-center gap-2 text-sm font-semibold">
                 <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-xs font-bold text-primary-foreground shadow-warm">
@@ -341,11 +399,21 @@ export default function Home() {
               <p className="mt-2 text-xs text-muted-foreground">Real growth, real people.</p>
             </div>
             <div>
-              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Product</p>
+              <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">Company</p>
               <ul className="mt-2 space-y-1.5 text-sm">
+                <li>
+                  <Link href="/blog" className="hover:underline">
+                    Blog
+                  </Link>
+                </li>
                 <li>
                   <Link href="/services" className="hover:underline">
                     Services
+                  </Link>
+                </li>
+                <li>
+                  <Link href="/#faq" className="hover:underline">
+                    FAQ
                   </Link>
                 </li>
                 <li>
@@ -383,12 +451,15 @@ export default function Home() {
                     Privacy Policy
                   </Link>
                 </li>
+                <li>
+                  <Link href="/refund-policy" className="hover:underline">
+                    Refund Policy
+                  </Link>
+                </li>
               </ul>
             </div>
           </div>
-          <p className="mt-8 text-xs text-muted-foreground">
-            © {new Date().getFullYear()} Hayathmanager. Real growth services, no bots.
-          </p>
+          <p className="mt-8 text-xs text-muted-foreground">Hayathmanager © 2026. Real growth services, no bots.</p>
         </div>
       </footer>
     </div>

@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
+import { Suspense, useCallback, useEffect, useState } from 'react';
+import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { ApiError } from '../../lib/api';
 import { useAuth } from '../../lib/auth-context';
@@ -175,14 +175,22 @@ function ServiceCard({
 
 function ServicesContent() {
   const { user } = useAuth();
+  const searchParams = useSearchParams();
   const [services, setServices] = useState<Service[] | null>(null);
   const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
+  const initialPlatform = searchParams.get('platform');
+  const initialCategory = searchParams.get('category');
+
   const [search, setSearch] = useState('');
-  const [platform, setPlatform] = useState<ServicePlatform | ''>('');
-  const [category, setCategory] = useState<ServiceCategory | ''>('');
+  const [platform, setPlatform] = useState<ServicePlatform | ''>(
+    PLATFORMS.includes(initialPlatform as ServicePlatform) ? (initialPlatform as ServicePlatform) : '',
+  );
+  const [category, setCategory] = useState<ServiceCategory | ''>(
+    CATEGORIES.includes(initialCategory as ServiceCategory) ? (initialCategory as ServiceCategory) : '',
+  );
 
   const load = useCallback(async () => {
     setLoading(true);
@@ -299,7 +307,7 @@ function ServicesContent() {
   );
 }
 
-export default function ServicesPage() {
+function ServicesPageInner() {
   const { user, loading: authLoading } = useAuth();
 
   if (authLoading) {
@@ -330,5 +338,13 @@ export default function ServicesPage() {
         <ServicesContent />
       </main>
     </div>
+  );
+}
+
+export default function ServicesPage() {
+  return (
+    <Suspense fallback={null}>
+      <ServicesPageInner />
+    </Suspense>
   );
 }
