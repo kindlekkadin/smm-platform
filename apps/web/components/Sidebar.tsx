@@ -95,9 +95,9 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         className="flex items-center gap-2 px-5 py-5 text-lg font-semibold tracking-tight"
       >
         <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-foreground shadow-warm">
-          S
+          H
         </span>
-        <span>SMM Platform</span>
+        <span>Hayathmanager</span>
       </Link>
 
       <nav className="flex-1 space-y-1 px-3">
@@ -155,9 +155,9 @@ export default function Sidebar() {
       <div className="sticky top-0 z-20 flex items-center justify-between border-b border-border bg-card/90 px-4 py-3 backdrop-blur md:hidden">
         <Link href="/dashboard" className="flex items-center gap-2 text-base font-semibold tracking-tight">
           <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary text-xs font-bold text-primary-foreground shadow-warm">
-            S
+            H
           </span>
-          SMM Platform
+          Hayathmanager
         </Link>
         <button
           onClick={() => setMobileOpen(true)}

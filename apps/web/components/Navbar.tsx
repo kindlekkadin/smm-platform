@@ -15,9 +15,9 @@ export default function Navbar() {
       <div className="mx-auto flex max-w-5xl items-center justify-between px-4 py-3 sm:px-6">
         <Link href="/dashboard" className="flex items-center gap-2 text-lg font-semibold tracking-tight">
           <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-primary text-sm font-bold text-primary-foreground shadow-warm">
-            S
+            H
           </span>
-          <span>SMM Platform</span>
+          <span>Hayathmanager</span>
         </Link>
 
         {user && (
