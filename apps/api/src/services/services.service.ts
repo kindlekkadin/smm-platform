@@ -53,6 +53,7 @@ export class ServicesService {
         flatPrice: dto.pricingModel === PricingModel.FLAT ? new Prisma.Decimal(dto.flatPrice!) : undefined,
         minQuantity: dto.minQuantity,
         maxQuantity: dto.maxQuantity,
+        estimatedDelivery: dto.estimatedDelivery,
       },
     });
   }
@@ -97,6 +98,7 @@ export class ServicesService {
         flatPrice: dto.flatPrice !== undefined ? new Prisma.Decimal(dto.flatPrice) : undefined,
         minQuantity: dto.minQuantity,
         maxQuantity: dto.maxQuantity,
+        estimatedDelivery: dto.estimatedDelivery,
       },
     });
   }

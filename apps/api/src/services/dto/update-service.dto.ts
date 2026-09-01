@@ -63,4 +63,9 @@ export class UpdateServiceDto {
   @IsInt()
   @IsPositive()
   maxQuantity?: number;
+
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  estimatedDelivery?: string;
 }

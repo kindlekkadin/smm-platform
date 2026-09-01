@@ -49,6 +49,7 @@ export default function AdminServicesPage() {
     flatPrice: '',
     minQuantity: '',
     maxQuantity: '',
+    estimatedDelivery: '',
   });
 
   const load = useCallback(async () => {
@@ -91,6 +92,7 @@ export default function AdminServicesPage() {
         flatPrice: form.pricingModel === 'FLAT' ? Number(form.flatPrice) : undefined,
         minQuantity: Number(form.minQuantity),
         maxQuantity: Number(form.maxQuantity),
+        estimatedDelivery: form.estimatedDelivery || undefined,
       });
       setForm({
         name: '',
@@ -103,6 +105,7 @@ export default function AdminServicesPage() {
         flatPrice: '',
         minQuantity: '',
         maxQuantity: '',
+        estimatedDelivery: '',
       });
       await load();
     } catch (err) {
@@ -243,6 +246,13 @@ export default function AdminServicesPage() {
               className="rounded border border-zinc-300 px-2 py-1.5 text-sm"
             />
           </div>
+          <input
+            type="text"
+            placeholder="Estimated delivery (optional, e.g. '1-3 hours')"
+            value={form.estimatedDelivery}
+            onChange={(e) => setForm({ ...form, estimatedDelivery: e.target.value })}
+            className="w-full rounded border border-zinc-300 px-2 py-1.5 text-sm"
+          />
           {error && <p className="text-xs text-red-600">{error}</p>}
           <button
             type="submit"

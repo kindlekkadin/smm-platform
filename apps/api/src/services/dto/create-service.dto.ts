@@ -1,4 +1,14 @@
-import { IsEnum, IsInt, IsPositive, IsString, Matches, MaxLength, MinLength, ValidateIf } from 'class-validator';
+import {
+  IsEnum,
+  IsInt,
+  IsOptional,
+  IsPositive,
+  IsString,
+  Matches,
+  MaxLength,
+  MinLength,
+  ValidateIf,
+} from 'class-validator';
 import { PricingModel, ServiceCategory, SocialPlatform } from '@prisma/client';
 
 export class CreateServiceDto {
@@ -45,4 +55,11 @@ export class CreateServiceDto {
   @IsInt()
   @IsPositive()
   maxQuantity!: number;
+
+  // Human-readable turnaround estimate (e.g. "1-3 hours"), set by an admin —
+  // never inferred or guessed by the app. Shown as "Varies" when absent.
+  @IsOptional()
+  @IsString()
+  @MaxLength(60)
+  estimatedDelivery?: string;
 }

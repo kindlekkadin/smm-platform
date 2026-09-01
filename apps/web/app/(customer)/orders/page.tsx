@@ -1,9 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useState } from 'react';
-import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { useAuth } from '../../../lib/auth-context';
 import { ApiError } from '../../../lib/api';
 import { Order, listOrders } from '../../../lib/orders-api';
 
@@ -17,9 +15,6 @@ const STATUS_STYLES: Record<string, string> = {
 };
 
 export default function OrdersPage() {
-  const router = useRouter();
-  const { user, loading: authLoading } = useAuth();
-
   const [orders, setOrders] = useState<Order[] | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -38,84 +33,65 @@ export default function OrdersPage() {
   }, []);
 
   useEffect(() => {
-    if (!authLoading && !user) {
-      router.push('/login');
-      return;
-    }
-    if (user) {
-      void load();
-    }
-  }, [authLoading, user, router, load]);
-
-  if (authLoading || (user && loading && orders === null)) {
-    return (
-      <main className="flex min-h-screen items-center justify-center">
-        <p className="text-sm text-zinc-500">Loading…</p>
-      </main>
-    );
-  }
-
-  if (!user) {
-    return null;
-  }
+    void load();
+  }, [load]);
 
   return (
-    <main className="flex min-h-screen flex-col items-center px-4 py-16">
-      <div className="w-full max-w-2xl space-y-6">
-        <div className="flex items-center justify-between">
-          <h1 className="text-2xl font-semibold">Your Orders</h1>
-          <Link href="/orders/new" className="text-sm font-medium underline">
-            New order
-          </Link>
-        </div>
-
-        {error && (
-          <p className="text-sm text-red-600 bg-red-50 border border-red-200 rounded px-3 py-2">
-            {error}
-          </p>
-        )}
-
-        {loading && <p className="text-sm text-zinc-500">Loading orders…</p>}
-
-        {!loading && orders && orders.length === 0 && (
-          <p className="text-sm text-zinc-500 border border-dashed border-zinc-300 rounded px-3 py-6 text-center">
-            No orders yet.{' '}
-            <Link href="/orders/new" className="underline font-medium">
-              Place your first order
-            </Link>
-            .
-          </p>
-        )}
-
-        {!loading && orders && orders.length > 0 && (
-          <ul className="space-y-2">
-            {orders.map((order) => (
-              <li key={order.id}>
-                <Link
-                  href={`/orders/${order.id}`}
-                  className="flex items-center justify-between rounded border border-zinc-200 px-4 py-3 hover:border-zinc-400"
-                >
-                  <div>
-                    <p className="text-sm font-medium">{order.service.name}</p>
-                    <p className="text-xs text-zinc-500">
-                      @{order.socialAccount.username} ({order.socialAccount.platform}) ·{' '}
-                      {order.quantity.toLocaleString()} units · {order.totalPrice}
-                    </p>
-                    <p className="text-xs text-zinc-400">
-                      {new Date(order.createdAt).toLocaleString()}
-                    </p>
-                  </div>
-                  <span
-                    className={`text-xs font-medium border rounded px-2 py-1 ${STATUS_STYLES[order.status] ?? ''}`}
-                  >
-                    {order.status}
-                  </span>
-                </Link>
-              </li>
-            ))}
-          </ul>
-        )}
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <h1 className="text-2xl font-semibold tracking-tight">Orders History</h1>
+        <Link
+          href="/orders/new"
+          className="rounded-xl bg-primary px-4 py-2 text-sm font-medium text-primary-foreground shadow-warm hover:brightness-105"
+        >
+          New order
+        </Link>
       </div>
-    </main>
+
+      {error && (
+        <p className="rounded-xl border border-red-200 bg-red-50 px-3 py-2 text-sm text-red-700">{error}</p>
+      )}
+
+      {loading && <p className="text-sm text-muted-foreground">Loading orders…</p>}
+
+      {!loading && orders && orders.length === 0 && (
+        <p className="rounded-xl border border-dashed border-border px-4 py-8 text-center text-sm text-muted-foreground">
+          No orders yet.{' '}
+          <Link href="/orders/new" className="font-medium underline">
+            Place your first order
+          </Link>
+          .
+        </p>
+      )}
+
+      {!loading && orders && orders.length > 0 && (
+        <ul className="space-y-2">
+          {orders.map((order) => (
+            <li key={order.id}>
+              <Link
+                href={`/orders/${order.id}`}
+                className="flex items-center justify-between rounded-xl border border-border bg-card px-4 py-3 shadow-warm hover:border-peach-deep"
+              >
+                <div>
+                  <p className="text-sm font-medium">{order.service.name}</p>
+                  <p className="text-xs text-muted-foreground">
+                    @{order.socialAccount.username} ({order.socialAccount.platform}) ·{' '}
+                    {order.quantity.toLocaleString()} · {order.totalPrice}
+                  </p>
+                  <p className="text-xs text-muted-foreground/70">
+                    {new Date(order.createdAt).toLocaleString()}
+                  </p>
+                </div>
+                <span
+                  className={`rounded-lg border px-2 py-1 text-xs font-medium ${STATUS_STYLES[order.status] ?? ''}`}
+                >
+                  {order.status}
+                </span>
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
   );
 }

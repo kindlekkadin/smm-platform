@@ -29,6 +29,9 @@ export interface Service {
   flatPrice: string | null;
   minQuantity: number;
   maxQuantity: number;
+  // Admin-set turnaround estimate (e.g. "1-3 hours"). Null means no estimate
+  // was given — never invent one on the frontend.
+  estimatedDelivery: string | null;
   active: boolean;
   createdAt: string;
   updatedAt: string;
@@ -77,6 +80,7 @@ export interface CreateServiceInput {
   flatPrice?: number;
   minQuantity: number;
   maxQuantity: number;
+  estimatedDelivery?: string;
 }
 
 export function adminListServices() {
