@@ -3,7 +3,8 @@ import { Prisma } from '@prisma/client';
 
 export interface CreatePaymentInput {
   paymentId: string;
-  orderId: string;
+  // Absent for a wallet top-up — there's no Order to attach it to.
+  orderId?: string;
   userId: string;
   amount: Prisma.Decimal;
 }

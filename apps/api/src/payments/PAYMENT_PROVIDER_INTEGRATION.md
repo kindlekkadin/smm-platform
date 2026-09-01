@@ -1,19 +1,41 @@
 # Adding a real payment provider
 
-As of Phase 5, the only registered provider is `DevMockPaymentProvider`
+As of Phase 5, the only always-active provider is `DevMockPaymentProvider`
 (`provider: DEV_MOCK`). It never contacts any external service and never
 represents real money — it exists purely to exercise order confirmation,
 refunds, and the webhook flow end to end.
 
-## Why no real provider yet
+## PayMongo — implemented, but inactive without real credentials
 
-No payment provider has been selected for this project. The original
-platform plan called for comparing options available to a Philippines-based
-business (Stripe, PayMongo, Xendit, DragonPay, PayPal, GCash/Maya) on fees,
-PH payout availability, API capabilities, and KYB/verification requirements
-— that decision was deliberately deferred and no provider credentials exist
-in this environment. `PaymentProvider` reserves the shape for one; adding it
-doesn't require touching `PaymentsService`, the controllers, or the schema.
+`PayMongoPaymentProvider` (`providers/paymongo-payment.provider.ts`) exists
+and covers GCash, Maya, and QR Ph via PayMongo's Checkout Sessions API. It
+is only registered in `PaymentsModule`'s `PAYMENT_PROVIDERS` factory — and
+therefore only ever selected by `PaymentsService.resolveActiveProvider()` —
+when **both** `PAYMONGO_SECRET_KEY` and `PAYMONGO_WEBHOOK_SECRET` are set in
+the environment. No credentials configured means DEV_MOCK remains the only
+active provider for both order payments and wallet top-ups, exactly as
+before.
+
+**This has never been exercised against a live PayMongo account** — no
+credentials exist in this environment, so it was written against PayMongo's
+publicly documented API shape and webhook signing scheme, not verified
+end-to-end. Before adding real keys, re-check against current PayMongo
+docs / a sandbox account:
+- the exact response shape of `POST /v1/checkout_sessions`,
+- the webhook event `type` string(s) for a completed checkout payment (the
+  adapter currently treats any type ending in `.paid` as success and
+  `.failed` as failure),
+- that `reference_number` (set to our own `Payment.id` at checkout-session
+  creation) is actually echoed back on the webhook payload at the path the
+  adapter reads it from — that's the field used to look up the local
+  `Payment` row, chosen specifically to avoid depending on PayMongo's own
+  internal id nesting.
+
+## Xendit and others — not built
+
+No other provider has been selected or implemented. `PaymentProvider`
+reserves the shape for one; adding it doesn't require touching
+`PaymentsService`, the controllers, or the schema.
 
 ## What's required before a real provider can be added
 

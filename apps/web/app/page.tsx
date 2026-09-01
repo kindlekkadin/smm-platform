@@ -68,7 +68,7 @@ const FAQS = [
   },
   {
     q: 'Will my money be returned to my balance if an order is cancelled?',
-    a: 'There’s no account balance to refund into — that feature doesn’t exist yet. You can cancel any order yourself for free before you pay; once paid, cancellation isn’t self-service, and refunds are handled manually by an admin case by case. See our Refund Policy for the full picture.',
+    a: 'Order payments and your account balance are separate today — there’s no way to pay for an order from your balance yet, so a refund doesn’t touch it. You can cancel any order yourself for free before you pay; once paid, cancellation isn’t self-service, and refunds are handled manually by an admin case by case. See our Refund Policy for the full picture.',
   },
 ];
 

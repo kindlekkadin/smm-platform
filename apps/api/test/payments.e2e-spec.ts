@@ -102,6 +102,9 @@ describe('Payments (e2e)', () => {
   });
 
   afterAll(async () => {
+    await prisma.walletTransaction.deleteMany({
+      where: { user: { email: { in: [ownerEmail, otherEmail] } } },
+    });
     await prisma.payment.deleteMany({
       where: { user: { email: { in: [ownerEmail, otherEmail] } } },
     });
@@ -305,6 +308,81 @@ describe('Payments (e2e)', () => {
       expect(refundRes.body.payment.status).toBe('REFUNDED');
 
       await adminAgent.post(`/api/admin/payments/${initRes.body.payment.id}/refund`).expect(400);
+    });
+  });
+
+  describe('wallet top-up', () => {
+    it('rejects an unauthenticated request', async () => {
+      await request(app.getHttpServer())
+        .post('/api/wallet/top-up')
+        .send({ amount: 10 })
+        .expect(401);
+    });
+
+    it('rejects a non-positive amount', async () => {
+      await ownerAgent.post('/api/wallet/top-up').send({ amount: 0 }).expect(400);
+      await ownerAgent.post('/api/wallet/top-up').send({ amount: -5 }).expect(400);
+    });
+
+    it('rejects an amount above the maximum', async () => {
+      await ownerAgent.post('/api/wallet/top-up').send({ amount: 1_000_000 }).expect(400);
+    });
+
+    it('creates a PENDING wallet-top-up payment with no order attached', async () => {
+      const res = await ownerAgent.post('/api/wallet/top-up').send({ amount: 25 }).expect(201);
+
+      expect(res.body.payment.status).toBe('PENDING');
+      expect(res.body.payment.purpose).toBe('WALLET_TOP_UP');
+      expect(res.body.payment.orderId).toBeNull();
+      expect(res.body.payment.amount).toBe('25');
+      expect(res.body.redirectUrl).toContain(res.body.payment.id);
+    });
+
+    it('starts a new user at a zero balance with no transactions', async () => {
+      const res = await otherAgent.get('/api/wallet').expect(200);
+      expect(res.body.balance).toBe('0');
+      expect(res.body.transactions).toEqual([]);
+    });
+
+    it('credits the balance once the webhook reports success, and is idempotent on replay', async () => {
+      const beforeRes = await otherAgent.get('/api/wallet').expect(200);
+      const before = Number(beforeRes.body.balance);
+
+      const topUpRes = await otherAgent.post('/api/wallet/top-up').send({ amount: 15 }).expect(201);
+
+      const payload = { providerRef: topUpRes.body.payment.providerRef, outcome: 'SUCCEEDED' };
+      await request(app.getHttpServer()).post('/api/payments/webhooks/DEV_MOCK').send(payload).expect(201);
+      // Replayed webhook must not double-credit.
+      await request(app.getHttpServer()).post('/api/payments/webhooks/DEV_MOCK').send(payload).expect(201);
+
+      const afterRes = await otherAgent.get('/api/wallet').expect(200);
+      expect(Number(afterRes.body.balance)).toBe(before + 15);
+      expect(
+        afterRes.body.transactions.filter((t: { paymentId: string }) => t.paymentId === topUpRes.body.payment.id),
+      ).toHaveLength(1);
+    });
+
+    it('does not credit the balance when the webhook reports failure', async () => {
+      const beforeRes = await otherAgent.get('/api/wallet').expect(200);
+      const before = Number(beforeRes.body.balance);
+
+      const topUpRes = await otherAgent.post('/api/wallet/top-up').send({ amount: 40 }).expect(201);
+      await request(app.getHttpServer())
+        .post('/api/payments/webhooks/DEV_MOCK')
+        .send({ providerRef: topUpRes.body.payment.providerRef, outcome: 'FAILED' })
+        .expect(201);
+
+      const afterRes = await otherAgent.get('/api/wallet').expect(200);
+      expect(Number(afterRes.body.balance)).toBe(before);
+    });
+
+    it("keeps each user's balance independent of the other's top-ups", async () => {
+      // owner and other have each topped up in earlier tests in this
+      // describe block; their balances must not have leaked into each other.
+      const ownerRes = await ownerAgent.get('/api/wallet').expect(200);
+      const otherRes = await otherAgent.get('/api/wallet').expect(200);
+      expect(Number(ownerRes.body.balance)).toBe(0);
+      expect(Number(otherRes.body.balance)).toBe(15);
     });
   });
 });

@@ -45,7 +45,7 @@ export default function MockCheckoutPage() {
     setSubmitting(true);
     try {
       await simulateWebhook(payment.providerRef, outcome);
-      router.push(`/orders/${payment.orderId}`);
+      router.push(payment.orderId ? `/orders/${payment.orderId}` : '/add-funds');
     } catch (err) {
       setError(err instanceof ApiError ? err.message : 'Failed to record payment outcome.');
       setSubmitting(false);

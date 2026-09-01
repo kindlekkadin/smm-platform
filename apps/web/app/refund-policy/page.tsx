@@ -22,10 +22,11 @@ export default function RefundPolicyPage() {
             a case-by-case basis.
           </p>
           <p>
-            <span className="font-medium text-foreground">There&apos;s no account balance.</span>{' '}
-            A refund doesn&apos;t get credited anywhere in-app — there&apos;s no wallet feature
-            yet (see Add Funds). Refund handling outside the unpaid-cancellation path is manual
-            today, not an automated system.
+            <span className="font-medium text-foreground">Order payments and your balance are separate.</span>{' '}
+            You can add funds to your account balance (see Add Funds), but there&apos;s no way to
+            pay for an order from that balance yet — so a refund on an order payment doesn&apos;t
+            touch your balance at all. Refund handling outside the unpaid-cancellation path is
+            manual today, not an automated system.
           </p>
         </div>
         <Link href="/" className="text-sm font-medium underline">

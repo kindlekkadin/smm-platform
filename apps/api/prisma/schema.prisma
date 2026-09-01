@@ -36,6 +36,7 @@ model User {
   socialAccounts SocialAccount[]
   orders        Order[]
   payments      Payment[]
+  walletTransactions WalletTransaction[]
   creatorProfile CreatorProfile?
 }
 
@@ -197,8 +198,13 @@ model Order {
 // Only DEV_MOCK is implemented — no real provider has been selected yet and
 // no credentials exist in this environment. See payments/PAYMENT_PROVIDER_INTEGRATION.md
 // for what a real provider (Stripe/PayMongo/Xendit/etc.) requires to be added.
+// PAYMONGO is only actually usable once PAYMONGO_SECRET_KEY and
+// PAYMONGO_WEBHOOK_SECRET are configured — see PAYMENT_PROVIDER_INTEGRATION.md.
+// Until then PaymentsModule never registers it and DEV_MOCK remains the only
+// active provider, exactly like every other "real" integration in this app.
 enum PaymentProvider {
   DEV_MOCK
+  PAYMONGO
 }
 
 enum PaymentStatus {
@@ -208,20 +214,32 @@ enum PaymentStatus {
   REFUNDED
 }
 
+// What a Payment is actually for. A wallet top-up has no Order to confirm —
+// it credits a WalletTransaction instead. Kept as an explicit field rather
+// than inferred from orderId being null, so the branch in the webhook
+// handler can't silently do the wrong thing if that ever changes.
+enum PaymentPurpose {
+  ORDER_PAYMENT
+  WALLET_TOP_UP
+}
+
 model Payment {
-  id      String @id @default(uuid())
-  orderId String
-  order   Order  @relation(fields: [orderId], references: [id])
+  id      String  @id @default(uuid())
+  orderId String?
+  order   Order?  @relation(fields: [orderId], references: [id])
   userId  String
-  user    User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user    User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  purpose PaymentPurpose @default(ORDER_PAYMENT)
 
   provider    PaymentProvider
   // Opaque reference from the provider (session/intent id). For DEV_MOCK this
   // is an unguessable generated id, not a real payment identifier.
   providerRef String          @unique
 
-  // Snapshot of order.totalPrice at payment-initiation time — never derived
-  // from a client-supplied amount.
+  // Snapshot of order.totalPrice (ORDER_PAYMENT) or the customer-entered
+  // top-up amount (WALLET_TOP_UP) at payment-initiation time — never derived
+  // from a client-supplied amount at webhook time.
   amount Decimal @db.Decimal(10, 2)
 
   status        PaymentStatus @default(PENDING)
@@ -231,9 +249,38 @@ model Payment {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
+  walletTransaction WalletTransaction?
+
   @@index([userId])
   @@index([orderId])
   @@index([status])
+}
+
+// Ledger, not a mutable counter — balance is always SUM(amount) for a user,
+// mirroring how CreatorEarning/PayoutRequest already compute creator
+// balance in this codebase. Only TOP_UP exists today: adding funds is live,
+// but nothing spends from this balance yet (orders are still paid
+// individually) — see the Add Funds page copy for the honest disclosure.
+enum WalletTransactionType {
+  TOP_UP
+}
+
+model WalletTransaction {
+  id     String                @id @default(uuid())
+  userId String
+  user   User                  @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type   WalletTransactionType
+  amount Decimal               @db.Decimal(10, 2)
+
+  // The Payment that produced this credit. One-to-one and unique so a
+  // replayed webhook can never double-credit — the DB itself rejects it,
+  // on top of PaymentsService's own PENDING-status idempotency guard.
+  paymentId String?  @unique
+  payment   Payment? @relation(fields: [paymentId], references: [id])
+
+  createdAt DateTime @default(now())
+
+  @@index([userId])
 }
 
 // ---- Phase 6: Creator Marketplace ----

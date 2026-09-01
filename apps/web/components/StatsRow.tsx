@@ -1,5 +1,9 @@
+'use client';
+
+import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { Order } from '../lib/orders-api';
+import { getWallet } from '../lib/payments-api';
 
 const PAID_STATUSES = new Set(['CONFIRMED', 'PROCESSING', 'COMPLETED']);
 
@@ -22,6 +26,14 @@ function Segment({
 }
 
 export default function StatsRow({ orders, loading }: { orders: Order[] | null; loading: boolean }) {
+  const [balance, setBalance] = useState<string | null>(null);
+
+  useEffect(() => {
+    void getWallet()
+      .then(({ balance }) => setBalance(balance))
+      .catch(() => setBalance(null));
+  }, []);
+
   const totalOrders = orders?.length ?? 0;
   const totalSpent = orders
     ? orders
@@ -33,10 +45,10 @@ export default function StatsRow({ orders, loading }: { orders: Order[] | null; 
     <div className="flex flex-col divide-y divide-border rounded-xl border border-border bg-card shadow-warm sm:flex-row sm:divide-x sm:divide-y-0">
       <Segment
         label="Account Balance"
-        value={<span className="text-muted-foreground">Coming soon</span>}
+        value={balance === null ? '…' : balance}
         sub={
           <Link href="/add-funds" className="underline">
-            Learn more
+            Add funds
           </Link>
         }
       />

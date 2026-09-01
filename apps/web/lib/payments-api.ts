@@ -1,12 +1,14 @@
 import { request } from './api';
 
 export type PaymentStatus = 'PENDING' | 'SUCCEEDED' | 'FAILED' | 'REFUNDED';
-export type PaymentProvider = 'DEV_MOCK';
+export type PaymentProvider = 'DEV_MOCK' | 'PAYMONGO';
+export type PaymentPurpose = 'ORDER_PAYMENT' | 'WALLET_TOP_UP';
 
 export interface Payment {
   id: string;
-  orderId: string;
+  orderId: string | null;
   userId: string;
+  purpose: PaymentPurpose;
   provider: PaymentProvider;
   providerRef: string;
   amount: string;
@@ -17,6 +19,15 @@ export interface Payment {
   updatedAt: string;
 }
 
+export interface WalletTransaction {
+  id: string;
+  userId: string;
+  type: 'TOP_UP';
+  amount: string;
+  paymentId: string | null;
+  createdAt: string;
+}
+
 export function initiatePayment(orderId: string) {
   return request<{ payment: Payment; redirectUrl: string }>(`/api/orders/${orderId}/payments`, {
     method: 'POST',
@@ -25,6 +36,17 @@ export function initiatePayment(orderId: string) {
 
 export function getPayment(id: string) {
   return request<{ payment: Payment }>(`/api/payments/${id}`);
+}
+
+export function getWallet() {
+  return request<{ balance: string; transactions: WalletTransaction[] }>('/api/wallet');
+}
+
+export function initiateTopUp(amount: number) {
+  return request<{ payment: Payment; redirectUrl: string }>('/api/wallet/top-up', {
+    method: 'POST',
+    body: JSON.stringify({ amount }),
+  });
 }
 
 /**

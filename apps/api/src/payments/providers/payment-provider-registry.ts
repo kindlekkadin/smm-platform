@@ -27,4 +27,8 @@ export class PaymentProviderRegistry {
     }
     return adapter;
   }
+
+  has(provider: PaymentProvider): boolean {
+    return this.providers.has(provider);
+  }
 }
