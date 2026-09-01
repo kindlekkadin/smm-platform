@@ -1,26 +1,91 @@
 @import "tailwindcss";
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  /* ---- Peach design system ---- */
+  /* Raw palette, per the locked spec. */
+  --color-peach-light: #fff8f5;   /* warm background tint */
+  --color-peach: #ffcba4;         /* soft peach — hover/secondary surfaces, badges */
+  --color-peach-deep: #f8ad9d;    /* primary peach — buttons, active tabs, highlights */
+  --color-coral: #f4978e;         /* muted coral — secondary accent */
+  --color-espresso: #3b2a24;      /* deep warm brown — dark containers */
+  --color-espresso-light: #4a362d;
+
+  /* Semantic aliases components should actually reach for. */
+  --background: var(--color-peach-light);
+  --foreground: #3a2a22;
+
+  --primary: var(--color-peach-deep);
+  /* Peach/coral are light, so a dark warm brown (not white) is what
+     actually clears WCAG contrast for text sitting on them. */
+  --primary-foreground: #3a2015;
+
+  --secondary: var(--color-coral);
+  --secondary-foreground: #3a2015;
+
+  --card: #ffffff;
+  --card-foreground: var(--foreground);
+  --border: #f3d9cc;
+  --muted: #fdede6;
+  --muted-foreground: #8a6f63;
+
+  --radius: 0.75rem; /* rounded-xl */
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-border: var(--border);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+
+  --color-peach-light: var(--color-peach-light);
+  --color-peach: var(--color-peach);
+  --color-peach-deep: var(--color-peach-deep);
+  --color-coral: var(--color-coral);
+  --color-espresso: var(--color-espresso);
+  --color-espresso-light: var(--color-espresso-light);
+
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
+
+  --radius-xl: var(--radius);
+
+  /* Subtle warm shadow for cards — a soft peach-tinted glow instead of a
+     neutral grey shadow. */
+  --shadow-warm: 0 2px 8px 0 rgb(244 151 142 / 0.08), 0 8px 24px -4px rgb(244 151 142 / 0.15);
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
+    --background: var(--color-espresso);
+    --foreground: #fbefe9;
+
+    --card: var(--color-espresso-light);
+    --card-foreground: #fbefe9;
+    --border: #5c4339;
+    --muted: var(--color-espresso-light);
+    --muted-foreground: #d9beb0;
+
+    /* Primary stays peach in dark mode too — it's the brand accent, not
+       a light-mode-only surface color. */
+    --primary: var(--color-peach-deep);
+    --primary-foreground: #2a1810;
+    --secondary: var(--color-coral);
+    --secondary-foreground: #2a1810;
   }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
+  letter-spacing: -0.01em;
 }

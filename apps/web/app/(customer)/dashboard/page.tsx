@@ -4,10 +4,42 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import { useAuth } from '../../../lib/auth-context';
+import Navbar from '../../../components/Navbar';
+
+function ActionCard({ href, title, sub, tone = 'default' }: { href: string; title: string; sub?: string; tone?: 'default' | 'primary' | 'accent' }) {
+  const toneClasses =
+    tone === 'primary'
+      ? 'bg-primary text-primary-foreground border-transparent shadow-warm hover:brightness-105'
+      : tone === 'accent'
+        ? 'bg-secondary text-secondary-foreground border-transparent shadow-warm hover:brightness-105'
+        : 'bg-card text-card-foreground border-border hover:border-peach-deep hover:shadow-warm';
+
+  return (
+    <Link
+      href={href}
+      className={`rounded-xl border px-4 py-3.5 text-sm font-medium transition-all ${toneClasses}`}
+    >
+      <p>{title}</p>
+      {sub && <p className="mt-0.5 text-xs font-normal opacity-80">{sub}</p>}
+    </Link>
+  );
+}
+
+function Section({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <section className="space-y-3">
+      <h2 className="flex items-center gap-2 text-xs font-semibold tracking-wide text-muted-foreground uppercase">
+        <span className="h-1.5 w-1.5 rounded-full bg-peach-deep" />
+        {label}
+      </h2>
+      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">{children}</div>
+    </section>
+  );
+}
 
 export default function DashboardPage() {
   const router = useRouter();
-  const { user, loading, logout } = useAuth();
+  const { user, loading } = useAuth();
 
   useEffect(() => {
     if (!loading && !user) {
@@ -17,8 +49,8 @@ export default function DashboardPage() {
 
   if (loading) {
     return (
-      <main className="flex min-h-screen items-center justify-center">
-        <p className="text-sm text-zinc-500">Loading…</p>
+      <main className="flex min-h-screen items-center justify-center bg-background">
+        <p className="text-sm text-muted-foreground">Loading…</p>
       </main>
     );
   }
@@ -29,97 +61,42 @@ export default function DashboardPage() {
   }
 
   return (
-    <main className="flex min-h-screen flex-col items-center justify-center gap-4 px-4">
-      <h1 className="text-2xl font-semibold">Welcome, {user.displayName}</h1>
-      <p className="text-sm text-zinc-600">
-        {user.email} · {user.role}
-      </p>
-      <Link
-        href="/social-accounts"
-        className="rounded bg-zinc-900 text-white px-4 py-2 text-sm font-medium"
-      >
-        Manage social accounts
-      </Link>
-      <Link href="/services" className="rounded border border-zinc-300 px-4 py-2 text-sm font-medium">
-        Browse services
-      </Link>
-      <Link href="/orders" className="rounded border border-zinc-300 px-4 py-2 text-sm font-medium">
-        Your orders
-      </Link>
-      {user.role === 'CREATOR' && (
-        <Link
-          href="/creator/dashboard"
-          className="rounded border border-purple-300 bg-purple-50 px-4 py-2 text-sm font-medium text-purple-800"
-        >
-          Creator dashboard
-        </Link>
-      )}
-      {user.role === 'ADMIN' && (
-        <>
-          <Link
-            href="/admin/services"
-            className="rounded border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800"
-          >
-            Admin: manage services
-          </Link>
-          <Link
-            href="/admin/creators"
-            className="rounded border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800"
-          >
-            Admin: creator applications
-          </Link>
-          <Link
-            href="/admin/creator-offerings"
-            className="rounded border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800"
-          >
-            Admin: creator offerings
-          </Link>
-          <Link
-            href="/admin/assignments"
-            className="rounded border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800"
-          >
-            Admin: order assignments
-          </Link>
-          <Link
-            href="/admin/payouts"
-            className="rounded border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800"
-          >
-            Admin: payout requests
-          </Link>
-          <Link
-            href="/admin/providers"
-            className="rounded border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800"
-          >
-            Admin: providers
-          </Link>
-          <Link
-            href="/admin/provider-mappings"
-            className="rounded border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800"
-          >
-            Admin: provider mappings
-          </Link>
-          <Link
-            href="/admin/provider-logs"
-            className="rounded border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800"
-          >
-            Admin: provider dispatch log
-          </Link>
-          <Link
-            href="/admin/analytics"
-            className="rounded border border-amber-300 bg-amber-50 px-4 py-2 text-sm font-medium text-amber-800"
-          >
-            Admin: analytics & financial reporting
-          </Link>
-        </>
-      )}
-      <button
-        onClick={() => {
-          void logout().then(() => router.push('/login'));
-        }}
-        className="rounded border border-zinc-300 px-4 py-2 text-sm font-medium"
-      >
-        Log out
-      </button>
-    </main>
+    <div className="min-h-screen bg-background">
+      <Navbar />
+      <main className="mx-auto max-w-5xl space-y-8 px-4 py-8 sm:px-6">
+        <div>
+          <h1 className="text-2xl font-semibold tracking-tight">Welcome, {user.displayName}</h1>
+          <p className="text-sm text-muted-foreground">
+            {user.email} · {user.role}
+          </p>
+        </div>
+
+        <Section label="Your account">
+          <ActionCard href="/social-accounts" title="Manage social accounts" sub="Connect and review linked accounts" tone="primary" />
+          <ActionCard href="/services" title="Browse services" sub="See what's available to order" />
+          <ActionCard href="/orders" title="Your orders" sub="Track status and history" />
+        </Section>
+
+        {user.role === 'CREATOR' && (
+          <Section label="Creator">
+            <ActionCard href="/creator/dashboard" title="Creator dashboard" sub="Offerings, assignments, and earnings" tone="accent" />
+          </Section>
+        )}
+
+        {user.role === 'ADMIN' && (
+          <Section label="Admin">
+            <ActionCard href="/admin/services" title="Manage services" />
+            <ActionCard href="/admin/creators" title="Creator applications" />
+            <ActionCard href="/admin/creator-offerings" title="Creator offerings" />
+            <ActionCard href="/admin/assignments" title="Order assignments" />
+            <ActionCard href="/admin/payouts" title="Payout requests" />
+            <ActionCard href="/admin/providers" title="Providers" />
+            <ActionCard href="/admin/provider-mappings" title="Provider mappings" />
+            <ActionCard href="/admin/provider-logs" title="Provider dispatch log" />
+            <ActionCard href="/admin/analytics" title="Analytics & financial reporting" />
+          </Section>
+        )}
+      </main>
+    </div>
   );
 }
