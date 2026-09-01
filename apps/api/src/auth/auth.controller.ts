@@ -21,27 +21,23 @@ const AUTH_THROTTLE = {
   default: { limit: process.env.NODE_ENV === 'test' ? 1000 : 5, ttl: 60_000 },
 };
 
-// The frontend and API are deployed on different sites (e.g. *.vercel.app
-// vs *.onrender.com), so every request between them is cross-site from the
-// cookie's perspective. SameSite=Lax is never attached to a cross-site
-// fetch/XHR (only to top-level navigations), so in that environment login
-// would appear to succeed but every subsequent request — including the
-// post-login /api/auth/me refresh — silently loses the session, bouncing
-// the user straight back to /login. SameSite=None fixes that, at the cost
-// of removing this app's only CSRF protection (CORS does not prevent a
-// plain cross-site <form> POST from carrying this cookie). Acceptable for
-// now — this environment has no real payment/user data — but revisit
-// before any real-production use: a custom domain that puts both apps on
-// the same site, Bearer-token auth, or real CSRF tokens.
-const IS_CROSS_SITE_DEPLOYMENT = process.env.NODE_ENV === 'production';
+// The frontend proxies every /api/* call through its own origin
+// (apps/web/next.config.ts's rewrite) rather than the browser talking to
+// this API's origin directly — so this cookie is always first-party from
+// the browser's point of view, on every environment. That's what makes
+// SameSite=Lax both correct and sufficient here: it's the standard,
+// CSRF-safe default, not a compromise. (An earlier version of this file
+// used SameSite=None to work around the browser hitting this API's origin
+// directly, which made the cookie third-party and cost this app its CSRF
+// protection — the proxy fixed the actual problem instead of continuing
+// to patch cookie attributes around it.)
 const SESSION_COOKIE_OPTIONS = {
   httpOnly: true,
-  sameSite: (IS_CROSS_SITE_DEPLOYMENT ? 'none' : 'lax') as 'none' | 'lax',
-  // A SameSite=None cookie is rejected outright by browsers unless also
-  // Secure, and Secure cookies are refused over plain HTTP — exactly what
-  // local dev (http://localhost) is — so this must track NODE_ENV rather
-  // than being hardcoded either way.
-  secure: IS_CROSS_SITE_DEPLOYMENT,
+  sameSite: 'lax' as const,
+  // Real browsers refuse a `secure` cookie over plain HTTP, which is
+  // exactly what local dev (http://localhost) is — so this must track
+  // NODE_ENV rather than being hardcoded either way.
+  secure: process.env.NODE_ENV === 'production',
   path: '/',
 };
 
