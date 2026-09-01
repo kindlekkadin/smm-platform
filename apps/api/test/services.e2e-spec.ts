@@ -67,6 +67,7 @@ describe('Services (e2e)', () => {
     description: 'High quality Instagram followers.',
     category: 'FOLLOWERS',
     platform: 'INSTAGRAM',
+    pricingModel: 'PER_THOUSAND',
     pricePerThousand: 10,
     minQuantity: 100,
     maxQuantity: 10000,

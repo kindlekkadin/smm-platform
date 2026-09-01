@@ -1,5 +1,5 @@
 import { BadRequestException, ConflictException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
-import { CreatorOffering, CreatorOfferingStatus, Prisma } from '@prisma/client';
+import { CreatorOffering, CreatorOfferingStatus, PricingModel, Prisma } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreatorProfilesService } from './creator-profiles.service';
 import { CreateCreatorOfferingDto } from './dto/create-creator-offering.dto';
@@ -10,6 +10,19 @@ import { isValidOfferingStatusTransition } from './offering-status';
 function assertQuantityRangeIsValid(minQuantity: number, maxQuantity: number): void {
   if (minQuantity > maxQuantity) {
     throw new BadRequestException('minQuantity cannot be greater than maxQuantity');
+  }
+}
+
+function assertCreatorPriceMatchesPricingModel(
+  pricingModel: PricingModel,
+  creatorPricePerThousand: number | undefined,
+  creatorFlatPrice: number | undefined,
+): void {
+  if (pricingModel === PricingModel.PER_THOUSAND && creatorPricePerThousand === undefined) {
+    throw new BadRequestException('creatorPricePerThousand is required for a PER_THOUSAND service');
+  }
+  if (pricingModel === PricingModel.FLAT && creatorFlatPrice === undefined) {
+    throw new BadRequestException('creatorFlatPrice is required for a FLAT service');
   }
 }
 
@@ -29,6 +42,10 @@ export class CreatorOfferingsService {
     }
 
     assertQuantityRangeIsValid(dto.minQuantity, dto.maxQuantity);
+    // The offering's pricing model always mirrors its Service — never
+    // independently chosen — so the required price field is derived from
+    // the Service, not from client input.
+    assertCreatorPriceMatchesPricingModel(service.pricingModel, dto.creatorPricePerThousand, dto.creatorFlatPrice);
 
     const existing = await this.prisma.creatorOffering.findUnique({
       where: { creatorProfileId_serviceId: { creatorProfileId: profile.id, serviceId: dto.serviceId } },
@@ -41,7 +58,13 @@ export class CreatorOfferingsService {
       data: {
         creatorProfileId: profile.id,
         serviceId: dto.serviceId,
-        creatorPricePerThousand: new Prisma.Decimal(dto.creatorPricePerThousand),
+        pricingModel: service.pricingModel,
+        creatorPricePerThousand:
+          service.pricingModel === PricingModel.PER_THOUSAND
+            ? new Prisma.Decimal(dto.creatorPricePerThousand!)
+            : undefined,
+        creatorFlatPrice:
+          service.pricingModel === PricingModel.FLAT ? new Prisma.Decimal(dto.creatorFlatPrice!) : undefined,
         minQuantity: dto.minQuantity,
         maxQuantity: dto.maxQuantity,
         notes: dto.notes,
@@ -84,9 +107,16 @@ export class CreatorOfferingsService {
     return this.prisma.creatorOffering.update({
       where: { id },
       data: {
+        // pricingModel is fixed at creation (mirrors the Service), so only
+        // the field matching the offering's existing model is ever written —
+        // a stray value in the other field is silently ignored.
         creatorPricePerThousand:
-          dto.creatorPricePerThousand !== undefined
+          offering.pricingModel === PricingModel.PER_THOUSAND && dto.creatorPricePerThousand !== undefined
             ? new Prisma.Decimal(dto.creatorPricePerThousand)
+            : undefined,
+        creatorFlatPrice:
+          offering.pricingModel === PricingModel.FLAT && dto.creatorFlatPrice !== undefined
+            ? new Prisma.Decimal(dto.creatorFlatPrice)
             : undefined,
         minQuantity: dto.minQuantity,
         maxQuantity: dto.maxQuantity,

@@ -1,7 +1,7 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { AssignmentStatus, CreatorOfferingStatus, CreatorVerificationStatus, OrderAssignment, OrderStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { calculateEstimatedPrice } from '../services/pricing';
+import { calculatePrice } from '../services/pricing';
 import { CreatorProfilesService } from './creator-profiles.service';
 import { CreateAssignmentDto } from './dto/create-assignment.dto';
 import { isValidAssignmentTransition } from './assignment-status';
@@ -63,7 +63,9 @@ export class OrderAssignmentsService {
         creatorProfileId: offering.creatorProfileId,
         creatorOfferingId: offering.id,
         // Snapshot — frozen even if CreatorOffering's price changes later.
+        pricingModel: offering.pricingModel,
         creatorPricePerThousand: offering.creatorPricePerThousand,
+        creatorFlatPrice: offering.creatorFlatPrice,
         status: AssignmentStatus.OFFERED,
       },
     });
@@ -163,10 +165,16 @@ export class OrderAssignmentsService {
         await tx.order.update({ where: { id: order.id }, data: { status: OrderStatus.COMPLETED } });
       }
 
-      // earning = creatorPricePerThousand * quantity / 1000 — the locked
+      // earning = creatorPricePerThousand * quantity / 1000 (or
+      // creatorFlatPrice * quantity for FLAT-priced offerings) — the locked
       // Option A formula, computed once from the frozen snapshot. No
       // commission model exists or is invented here.
-      const amount = calculateEstimatedPrice(updated.creatorPricePerThousand, order.quantity);
+      const amount = calculatePrice(
+        updated.pricingModel,
+        updated.creatorPricePerThousand,
+        updated.creatorFlatPrice,
+        order.quantity,
+      );
       await tx.creatorEarning.create({
         data: {
           creatorProfileId: updated.creatorProfileId,

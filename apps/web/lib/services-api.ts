@@ -1,7 +1,21 @@
 import { request } from './api';
 
-export type ServiceCategory = 'FOLLOWERS' | 'LIKES' | 'VIEWS' | 'COMMENTS' | 'ENGAGEMENT' | 'OTHER';
+export type ServiceCategory =
+  | 'FOLLOWERS'
+  | 'LIKES'
+  | 'VIEWS'
+  | 'COMMENTS'
+  | 'ENGAGEMENT'
+  | 'UGC_CONTENT'
+  | 'SHOUTOUT'
+  | 'AD_CAMPAIGN'
+  | 'OTHER';
 export type ServicePlatform = 'INSTAGRAM' | 'TIKTOK' | 'YOUTUBE' | 'FACEBOOK' | 'X' | 'DEV_MOCK';
+export type PricingModel = 'PER_THOUSAND' | 'FLAT';
+
+// Organic promotional packages fulfilled by a human creator through the
+// marketplace, priced FLAT (per package) rather than per 1,000 units.
+export const ORGANIC_CATEGORIES: ServiceCategory[] = ['UGC_CONTENT', 'SHOUTOUT', 'AD_CAMPAIGN'];
 
 export interface Service {
   id: string;
@@ -10,7 +24,9 @@ export interface Service {
   description: string;
   category: ServiceCategory;
   platform: ServicePlatform;
-  pricePerThousand: string;
+  pricingModel: PricingModel;
+  pricePerThousand: string | null;
+  flatPrice: string | null;
   minQuantity: number;
   maxQuantity: number;
   active: boolean;
@@ -21,7 +37,9 @@ export interface Service {
 export interface EstimateResult {
   serviceId: string;
   quantity: number;
-  pricePerThousand: string;
+  pricingModel: PricingModel;
+  pricePerThousand: string | null;
+  flatPrice: string | null;
   estimatedPrice: string;
 }
 
@@ -54,7 +72,9 @@ export interface CreateServiceInput {
   description: string;
   category: ServiceCategory;
   platform: ServicePlatform;
-  pricePerThousand: number;
+  pricingModel: PricingModel;
+  pricePerThousand?: number;
+  flatPrice?: number;
   minQuantity: number;
   maxQuantity: number;
 }

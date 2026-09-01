@@ -83,6 +83,7 @@ describe('Orders (e2e)', () => {
         description: 'Service used for order e2e tests.',
         category: 'FOLLOWERS',
         platform: 'DEV_MOCK',
+        pricingModel: 'PER_THOUSAND',
         pricePerThousand: 10,
         minQuantity: 100,
         maxQuantity: 10000,

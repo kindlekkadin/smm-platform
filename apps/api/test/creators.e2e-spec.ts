@@ -28,6 +28,9 @@ describe('Creator Marketplace (e2e)', () => {
   let serviceId: string;
   let customerSocialAccountId: string;
 
+  const flatSlug = `creator-market-flat-service-${runId}`;
+  let flatServiceId: string;
+
   async function connectDevMockAccount(agent: ReturnType<typeof request.agent>, username: string) {
     const initiateRes = await agent.post('/api/social-accounts/DEV_MOCK/connect').expect(201);
     const completeRes = await agent
@@ -38,10 +41,10 @@ describe('Creator Marketplace (e2e)', () => {
   }
 
   /** Creates a CONFIRMED order (created + paid) ready for assignment. */
-  async function createConfirmedOrder(quantity: number) {
+  async function createConfirmedOrder(quantity: number, forServiceId: string = serviceId) {
     const orderRes = await customerAgent
       .post('/api/orders')
-      .send({ serviceId, socialAccountId: customerSocialAccountId, quantity })
+      .send({ serviceId: forServiceId, socialAccountId: customerSocialAccountId, quantity })
       .expect(201);
     const orderId = orderRes.body.order.id as string;
 
@@ -111,12 +114,29 @@ describe('Creator Marketplace (e2e)', () => {
         description: 'Service used for creator marketplace e2e tests.',
         category: 'FOLLOWERS',
         platform: 'DEV_MOCK',
+        pricingModel: 'PER_THOUSAND',
         pricePerThousand: 20,
         minQuantity: 100,
         maxQuantity: 100000,
       })
       .expect(201);
     serviceId = serviceRes.body.service.id;
+
+    const flatServiceRes = await adminAgent
+      .post('/api/admin/services')
+      .send({
+        name: 'Creator Market Flat Service',
+        slug: flatSlug,
+        description: 'FLAT-priced organic package (creator-fulfilled sponsored post) for e2e tests.',
+        category: 'AD_CAMPAIGN',
+        platform: 'DEV_MOCK',
+        pricingModel: 'FLAT',
+        flatPrice: 150,
+        minQuantity: 1,
+        maxQuantity: 5,
+      })
+      .expect(201);
+    flatServiceId = flatServiceRes.body.service.id;
 
     customerSocialAccountId = await connectDevMockAccount(customerAgent, `cm_customer_${runId}`);
   });
@@ -141,6 +161,7 @@ describe('Creator Marketplace (e2e)', () => {
     await prisma.order.deleteMany({ where: { user: { email: customerEmail } } });
     await prisma.socialAccount.deleteMany({ where: { user: { email: customerEmail } } });
     await prisma.service.deleteMany({ where: { slug: { startsWith: `creator-market-service-${runId}` } } });
+    await prisma.service.deleteMany({ where: { slug: flatSlug } });
     await prisma.user.deleteMany({
       where: { email: { in: [adminEmail, creatorEmail, otherCreatorEmail, customerEmail] } },
     });
@@ -484,6 +505,66 @@ describe('Creator Marketplace (e2e)', () => {
 
       // Terminal — cannot complete twice.
       await creatorAgent.patch(`/api/creators/assignments/${assignmentId}/complete`).expect(400);
+    });
+  });
+
+  describe('FLAT-priced organic packages (e.g. creator-fulfilled sponsored posts)', () => {
+    let flatOfferingId: string;
+
+    it('rejects an offering that quotes the wrong price field for a FLAT service', async () => {
+      await creatorAgent
+        .post('/api/creators/offerings')
+        .send({ serviceId: flatServiceId, creatorPricePerThousand: 12, minQuantity: 1, maxQuantity: 5 })
+        .expect(400);
+    });
+
+    it('lets an approved creator create a FLAT offering, copying pricingModel from the service', async () => {
+      const res = await creatorAgent
+        .post('/api/creators/offerings')
+        .send({ serviceId: flatServiceId, creatorFlatPrice: 100, minQuantity: 1, maxQuantity: 5 })
+        .expect(201);
+      expect(res.body.offering.pricingModel).toBe('FLAT');
+      expect(res.body.offering.creatorFlatPrice).toBe('100');
+      expect(res.body.offering.creatorPricePerThousand).toBeNull();
+      flatOfferingId = res.body.offering.id;
+
+      await adminAgent
+        .patch(`/api/admin/creator-offerings/${flatOfferingId}/status`)
+        .send({ status: 'APPROVED' })
+        .expect(200);
+    });
+
+    it('creates a FLAT order priced as flatPrice * quantity, not per-thousand', async () => {
+      const orderRes = await customerAgent
+        .post('/api/orders')
+        .send({ serviceId: flatServiceId, socialAccountId: customerSocialAccountId, quantity: 2 })
+        .expect(201);
+      expect(orderRes.body.order.pricingModel).toBe('FLAT');
+      expect(orderRes.body.order.unitFlatPrice).toBe('150');
+      expect(orderRes.body.order.unitPricePerThousand).toBeNull();
+      // 150 per package * 2 packages = 300 (not 150 * 2 / 1000)
+      expect(orderRes.body.order.totalPrice).toBe('300');
+    });
+
+    it('assigns, accepts, and completes a FLAT order, creating a correctly-calculated CreatorEarning', async () => {
+      const orderId = await createConfirmedOrder(3, flatServiceId); // 100 per package * 3 = 300
+      const assignRes = await adminAgent
+        .post(`/api/admin/orders/${orderId}/assignments`)
+        .send({ creatorOfferingId: flatOfferingId })
+        .expect(201);
+      expect(assignRes.body.assignment.pricingModel).toBe('FLAT');
+      expect(assignRes.body.assignment.creatorFlatPrice).toBe('100');
+      const assignmentId = assignRes.body.assignment.id;
+
+      await creatorAgent.patch(`/api/creators/assignments/${assignmentId}/accept`).expect(200);
+      const completeRes = await creatorAgent
+        .patch(`/api/creators/assignments/${assignmentId}/complete`)
+        .expect(200);
+      expect(completeRes.body.assignment.status).toBe('COMPLETED');
+
+      const earning = await prisma.creatorEarning.findUnique({ where: { orderAssignmentId: assignmentId } });
+      expect(earning).not.toBeNull();
+      expect(earning?.amount.toString()).toBe('300');
     });
   });
 

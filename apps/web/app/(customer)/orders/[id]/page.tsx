@@ -137,8 +137,12 @@ export default function OrderDetailPage() {
             <span className="font-medium">{order.quantity.toLocaleString()}</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-zinc-500">Unit price / 1,000</span>
-            <span className="font-medium">{order.unitPricePerThousand}</span>
+            <span className="text-zinc-500">
+              {order.pricingModel === 'FLAT' ? 'Price per package' : 'Unit price / 1,000'}
+            </span>
+            <span className="font-medium">
+              {order.pricingModel === 'FLAT' ? order.unitFlatPrice : order.unitPricePerThousand}
+            </span>
           </div>
           <div className="flex justify-between">
             <span className="text-zinc-500">Total price</span>

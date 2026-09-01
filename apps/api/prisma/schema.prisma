@@ -90,7 +90,21 @@ enum ServiceCategory {
   VIEWS
   COMMENTS
   ENGAGEMENT
+  // Organic, human-fulfilled packages sold through the creator marketplace —
+  // see PricingModel.FLAT below. Never fulfilled by a bot/automation provider.
+  UGC_CONTENT
+  SHOUTOUT
+  AD_CAMPAIGN
   OTHER
+}
+
+// How a Service (and, mirrored, a CreatorOffering/Order/OrderAssignment) is
+// priced. PER_THOUSAND is the original linear-scale model. FLAT is a fixed
+// package price (e.g. "one UGC video", "one sponsored post") where scaling by
+// quantity means "N packages", not "N units per thousand".
+enum PricingModel {
+  PER_THOUSAND
+  FLAT
 }
 
 model Service {
@@ -101,9 +115,15 @@ model Service {
   category    ServiceCategory
   platform    SocialPlatform
 
+  pricingModel PricingModel @default(PER_THOUSAND)
+
   // Price per 1,000 units. Decimal (not float) to avoid floating-point rounding
   // errors in money — this is what later phases' orders/pricing engine will read.
-  pricePerThousand Decimal    @db.Decimal(10, 2)
+  // Required when pricingModel is PER_THOUSAND, null when FLAT.
+  pricePerThousand Decimal? @db.Decimal(10, 2)
+  // Fixed price per package. Required when pricingModel is FLAT, null when
+  // PER_THOUSAND. Enforced in the DTO/service layer, not a DB constraint.
+  flatPrice        Decimal? @db.Decimal(10, 2)
   minQuantity      Int
   maxQuantity      Int
 
@@ -146,9 +166,13 @@ model Order {
 
   // Pricing snapshot at order-creation time — frozen so later Service price
   // changes never alter an existing order's price. Never recompute a
-  // historical order's total from the live Service record.
-  unitPricePerThousand Decimal @db.Decimal(10, 2)
-  totalPrice           Decimal @db.Decimal(10, 2)
+  // historical order's total from the live Service record. Mirrors
+  // Service's own pricingModel/pricePerThousand/flatPrice shape: exactly one
+  // of unitPricePerThousand/unitFlatPrice is set, matching pricingModel.
+  pricingModel         PricingModel @default(PER_THOUSAND)
+  unitPricePerThousand Decimal?     @db.Decimal(10, 2)
+  unitFlatPrice        Decimal?     @db.Decimal(10, 2)
+  totalPrice           Decimal      @db.Decimal(10, 2)
 
   status    OrderStatus @default(PENDING)
   createdAt DateTime    @default(now())
@@ -252,8 +276,17 @@ model CreatorOffering {
   serviceId        String
   service          Service        @relation(fields: [serviceId], references: [id])
 
+  // Always copied from the parent Service at creation time, never
+  // independently chosen — an offering can't quote a per-thousand rate for a
+  // flat-priced package or vice versa.
+  pricingModel PricingModel @default(PER_THOUSAND)
+
   // Creator's own quoted rate — independent of Service.pricePerThousand.
-  creatorPricePerThousand Decimal @db.Decimal(10, 2)
+  // Required when pricingModel is PER_THOUSAND, null when FLAT.
+  creatorPricePerThousand Decimal? @db.Decimal(10, 2)
+  // Creator's own quoted flat package price. Required when pricingModel is
+  // FLAT, null when PER_THOUSAND.
+  creatorFlatPrice        Decimal? @db.Decimal(10, 2)
   minQuantity             Int
   maxQuantity             Int
   notes                   String?
@@ -288,11 +321,13 @@ model OrderAssignment {
   creatorOfferingId String
   creatorOffering   CreatorOffering @relation(fields: [creatorOfferingId], references: [id])
 
-  // Snapshot of CreatorOffering.creatorPricePerThousand at assignment time —
-  // frozen so a later CreatorOffering price change never alters an in-flight
-  // or historical assignment/earning. Combined with Order.quantity this is
-  // the sole input to CreatorEarning.amount.
-  creatorPricePerThousand Decimal @db.Decimal(10, 2)
+  // Snapshot of CreatorOffering.pricingModel/creatorPricePerThousand/
+  // creatorFlatPrice at assignment time — frozen so a later CreatorOffering
+  // price change never alters an in-flight or historical assignment/earning.
+  // Combined with Order.quantity this is the sole input to CreatorEarning.amount.
+  pricingModel            PricingModel @default(PER_THOUSAND)
+  creatorPricePerThousand Decimal?     @db.Decimal(10, 2)
+  creatorFlatPrice        Decimal?     @db.Decimal(10, 2)
 
   status      AssignmentStatus @default(OFFERED)
   assignedAt  DateTime         @default(now())

@@ -6,7 +6,7 @@ import {
 } from '@nestjs/common';
 import { OrderStatus, Prisma, SocialAccountStatus } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
-import { assertQuantityInRange, calculateEstimatedPrice } from '../services/pricing';
+import { assertQuantityInRange, calculatePrice } from '../services/pricing';
 import { CreateOrderDto } from './dto/create-order.dto';
 import { isValidAdminTransition, CUSTOMER_CANCELLABLE_STATUS } from './order-status';
 
@@ -15,7 +15,9 @@ const ORDER_SELECT = {
   userId: true,
   quantity: true,
   targetIdentifier: true,
+  pricingModel: true,
   unitPricePerThousand: true,
+  unitFlatPrice: true,
   totalPrice: true,
   status: true,
   createdAt: true,
@@ -57,7 +59,12 @@ export class OrdersService {
 
     // Always computed server-side from the current Service record — never
     // trust a client-supplied price/total (CreateOrderDto has no such field).
-    const totalPrice = calculateEstimatedPrice(service.pricePerThousand, dto.quantity);
+    const totalPrice = calculatePrice(
+      service.pricingModel,
+      service.pricePerThousand,
+      service.flatPrice,
+      dto.quantity,
+    );
 
     const order = await this.prisma.order.create({
       data: {
@@ -66,7 +73,9 @@ export class OrdersService {
         socialAccountId: socialAccount.id,
         targetIdentifier: dto.targetIdentifier,
         quantity: dto.quantity,
+        pricingModel: service.pricingModel,
         unitPricePerThousand: service.pricePerThousand,
+        unitFlatPrice: service.flatPrice,
         totalPrice,
         status: OrderStatus.PENDING,
       },

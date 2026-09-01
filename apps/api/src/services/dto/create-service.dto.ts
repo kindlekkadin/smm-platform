@@ -1,5 +1,5 @@
-import { IsEnum, IsInt, IsPositive, IsString, Matches, MaxLength, MinLength } from 'class-validator';
-import { ServiceCategory, SocialPlatform } from '@prisma/client';
+import { IsEnum, IsInt, IsPositive, IsString, Matches, MaxLength, MinLength, ValidateIf } from 'class-validator';
+import { PricingModel, ServiceCategory, SocialPlatform } from '@prisma/client';
 
 export class CreateServiceDto {
   @IsString()
@@ -25,8 +25,18 @@ export class CreateServiceDto {
   @IsEnum(SocialPlatform)
   platform!: SocialPlatform;
 
+  @IsEnum(PricingModel)
+  pricingModel!: PricingModel;
+
+  // Required when pricingModel is PER_THOUSAND, ignored otherwise.
+  @ValidateIf((o: CreateServiceDto) => o.pricingModel === PricingModel.PER_THOUSAND)
   @IsPositive()
-  pricePerThousand!: number;
+  pricePerThousand?: number;
+
+  // Required when pricingModel is FLAT, ignored otherwise.
+  @ValidateIf((o: CreateServiceDto) => o.pricingModel === PricingModel.FLAT)
+  @IsPositive()
+  flatPrice?: number;
 
   @IsInt()
   @IsPositive()

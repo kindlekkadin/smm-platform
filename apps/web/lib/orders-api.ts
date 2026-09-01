@@ -1,5 +1,5 @@
 import { request } from './api';
-import { ServiceCategory, ServicePlatform } from './services-api';
+import { PricingModel, ServiceCategory, ServicePlatform } from './services-api';
 import { SocialAccountStatus, SocialPlatform } from './social-accounts-api';
 
 export type OrderStatus = 'PENDING' | 'CONFIRMED' | 'PROCESSING' | 'COMPLETED' | 'CANCELLED' | 'FAILED';
@@ -9,7 +9,9 @@ export interface Order {
   userId: string;
   quantity: number;
   targetIdentifier: string | null;
-  unitPricePerThousand: string;
+  pricingModel: PricingModel;
+  unitPricePerThousand: string | null;
+  unitFlatPrice: string | null;
   totalPrice: string;
   status: OrderStatus;
   createdAt: string;

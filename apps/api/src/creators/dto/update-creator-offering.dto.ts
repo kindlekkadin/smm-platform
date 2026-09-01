@@ -6,6 +6,10 @@ export class UpdateCreatorOfferingDto {
   creatorPricePerThousand?: number;
 
   @IsOptional()
+  @IsPositive()
+  creatorFlatPrice?: number;
+
+  @IsOptional()
   @IsInt()
   @IsPositive()
   minQuantity?: number;

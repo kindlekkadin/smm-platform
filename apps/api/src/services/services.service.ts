@@ -1,14 +1,27 @@
 import { BadRequestException, ConflictException, Injectable, NotFoundException } from '@nestjs/common';
-import { Prisma, Service } from '@prisma/client';
+import { PricingModel, Prisma, Service } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { CreateServiceDto } from './dto/create-service.dto';
 import { UpdateServiceDto } from './dto/update-service.dto';
 import { ListServicesQueryDto } from './dto/list-services-query.dto';
-import { assertQuantityInRange, calculateEstimatedPrice } from './pricing';
+import { assertQuantityInRange, calculatePrice } from './pricing';
 
 function assertQuantityRangeIsValid(minQuantity: number, maxQuantity: number): void {
   if (minQuantity > maxQuantity) {
     throw new BadRequestException('minQuantity cannot be greater than maxQuantity');
+  }
+}
+
+function assertPriceMatchesPricingModel(
+  pricingModel: PricingModel,
+  pricePerThousand: number | undefined,
+  flatPrice: number | undefined,
+): void {
+  if (pricingModel === PricingModel.PER_THOUSAND && pricePerThousand === undefined) {
+    throw new BadRequestException('pricePerThousand is required for PER_THOUSAND pricing');
+  }
+  if (pricingModel === PricingModel.FLAT && flatPrice === undefined) {
+    throw new BadRequestException('flatPrice is required for FLAT pricing');
   }
 }
 
@@ -20,6 +33,7 @@ export class ServicesService {
 
   async adminCreate(dto: CreateServiceDto): Promise<Service> {
     assertQuantityRangeIsValid(dto.minQuantity, dto.maxQuantity);
+    assertPriceMatchesPricingModel(dto.pricingModel, dto.pricePerThousand, dto.flatPrice);
 
     const existing = await this.prisma.service.findUnique({ where: { slug: dto.slug } });
     if (existing) {
@@ -33,7 +47,10 @@ export class ServicesService {
         description: dto.description,
         category: dto.category,
         platform: dto.platform,
-        pricePerThousand: new Prisma.Decimal(dto.pricePerThousand),
+        pricingModel: dto.pricingModel,
+        pricePerThousand:
+          dto.pricingModel === PricingModel.PER_THOUSAND ? new Prisma.Decimal(dto.pricePerThousand!) : undefined,
+        flatPrice: dto.pricingModel === PricingModel.FLAT ? new Prisma.Decimal(dto.flatPrice!) : undefined,
         minQuantity: dto.minQuantity,
         maxQuantity: dto.maxQuantity,
       },
@@ -46,6 +63,18 @@ export class ServicesService {
     const minQuantity = dto.minQuantity ?? service.minQuantity;
     const maxQuantity = dto.maxQuantity ?? service.maxQuantity;
     assertQuantityRangeIsValid(minQuantity, maxQuantity);
+
+    const pricingModel = dto.pricingModel ?? service.pricingModel;
+    // Only enforce presence of the matching price field when the pricing
+    // model is actually changing, or that field is being touched — a plain
+    // "update minQuantity" call shouldn't have to resend the price.
+    if (dto.pricingModel !== undefined || dto.pricePerThousand !== undefined || dto.flatPrice !== undefined) {
+      const pricePerThousand =
+        dto.pricePerThousand ?? (pricingModel === service.pricingModel ? service.pricePerThousand?.toNumber() : undefined);
+      const flatPrice =
+        dto.flatPrice ?? (pricingModel === service.pricingModel ? service.flatPrice?.toNumber() : undefined);
+      assertPriceMatchesPricingModel(pricingModel, pricePerThousand, flatPrice);
+    }
 
     if (dto.slug && dto.slug !== service.slug) {
       const existing = await this.prisma.service.findUnique({ where: { slug: dto.slug } });
@@ -62,8 +91,10 @@ export class ServicesService {
         description: dto.description,
         category: dto.category,
         platform: dto.platform,
+        pricingModel: dto.pricingModel,
         pricePerThousand:
           dto.pricePerThousand !== undefined ? new Prisma.Decimal(dto.pricePerThousand) : undefined,
+        flatPrice: dto.flatPrice !== undefined ? new Prisma.Decimal(dto.flatPrice) : undefined,
         minQuantity: dto.minQuantity,
         maxQuantity: dto.maxQuantity,
       },
@@ -115,11 +146,18 @@ export class ServicesService {
   async estimate(id: string, quantity: number) {
     const service = await this.get(id);
     assertQuantityInRange(quantity, service.minQuantity, service.maxQuantity);
-    const estimatedPrice = calculateEstimatedPrice(service.pricePerThousand, quantity);
+    const estimatedPrice = calculatePrice(
+      service.pricingModel,
+      service.pricePerThousand,
+      service.flatPrice,
+      quantity,
+    );
     return {
       serviceId: service.id,
       quantity,
-      pricePerThousand: service.pricePerThousand.toString(),
+      pricingModel: service.pricingModel,
+      pricePerThousand: service.pricePerThousand?.toString() ?? null,
+      flatPrice: service.flatPrice?.toString() ?? null,
       estimatedPrice: estimatedPrice.toString(),
     };
   }

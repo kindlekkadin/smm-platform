@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../../lib/auth-context';
 import { ApiError } from '../../../../lib/api';
 import {
+  PricingModel,
   Service,
   ServiceCategory,
   ServicePlatform,
@@ -14,7 +15,18 @@ import {
 } from '../../../../lib/services-api';
 
 const PLATFORMS: ServicePlatform[] = ['INSTAGRAM', 'TIKTOK', 'YOUTUBE', 'FACEBOOK', 'X'];
-const CATEGORIES: ServiceCategory[] = ['FOLLOWERS', 'LIKES', 'VIEWS', 'COMMENTS', 'ENGAGEMENT', 'OTHER'];
+const CATEGORIES: ServiceCategory[] = [
+  'FOLLOWERS',
+  'LIKES',
+  'VIEWS',
+  'COMMENTS',
+  'ENGAGEMENT',
+  'UGC_CONTENT',
+  'SHOUTOUT',
+  'AD_CAMPAIGN',
+  'OTHER',
+];
+const PRICING_MODELS: PricingModel[] = ['PER_THOUSAND', 'FLAT'];
 
 export default function AdminServicesPage() {
   const router = useRouter();
@@ -32,7 +44,9 @@ export default function AdminServicesPage() {
     description: '',
     category: 'FOLLOWERS' as ServiceCategory,
     platform: 'INSTAGRAM' as ServicePlatform,
+    pricingModel: 'PER_THOUSAND' as PricingModel,
     pricePerThousand: '',
+    flatPrice: '',
     minQuantity: '',
     maxQuantity: '',
   });
@@ -71,7 +85,10 @@ export default function AdminServicesPage() {
         description: form.description,
         category: form.category,
         platform: form.platform,
-        pricePerThousand: Number(form.pricePerThousand),
+        pricingModel: form.pricingModel,
+        pricePerThousand:
+          form.pricingModel === 'PER_THOUSAND' ? Number(form.pricePerThousand) : undefined,
+        flatPrice: form.pricingModel === 'FLAT' ? Number(form.flatPrice) : undefined,
         minQuantity: Number(form.minQuantity),
         maxQuantity: Number(form.maxQuantity),
       });
@@ -81,7 +98,9 @@ export default function AdminServicesPage() {
         description: '',
         category: 'FOLLOWERS',
         platform: 'INSTAGRAM',
+        pricingModel: 'PER_THOUSAND',
         pricePerThousand: '',
+        flatPrice: '',
         minQuantity: '',
         maxQuantity: '',
       });
@@ -172,16 +191,41 @@ export default function AdminServicesPage() {
               ))}
             </select>
           </div>
-          <div className="grid grid-cols-3 gap-2">
-            <input
-              required
-              type="number"
-              step="0.01"
-              placeholder="Price / 1000"
-              value={form.pricePerThousand}
-              onChange={(e) => setForm({ ...form, pricePerThousand: e.target.value })}
+          <div className="grid grid-cols-2 gap-2">
+            <select
+              value={form.pricingModel}
+              onChange={(e) => setForm({ ...form, pricingModel: e.target.value as PricingModel })}
               className="rounded border border-zinc-300 px-2 py-1.5 text-sm"
-            />
+            >
+              {PRICING_MODELS.map((m) => (
+                <option key={m} value={m}>
+                  {m === 'PER_THOUSAND' ? 'Per 1,000 units' : 'Flat price per package'}
+                </option>
+              ))}
+            </select>
+            {form.pricingModel === 'PER_THOUSAND' ? (
+              <input
+                required
+                type="number"
+                step="0.01"
+                placeholder="Price / 1000"
+                value={form.pricePerThousand}
+                onChange={(e) => setForm({ ...form, pricePerThousand: e.target.value })}
+                className="rounded border border-zinc-300 px-2 py-1.5 text-sm"
+              />
+            ) : (
+              <input
+                required
+                type="number"
+                step="0.01"
+                placeholder="Flat price / package"
+                value={form.flatPrice}
+                onChange={(e) => setForm({ ...form, flatPrice: e.target.value })}
+                className="rounded border border-zinc-300 px-2 py-1.5 text-sm"
+              />
+            )}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
             <input
               required
               type="number"

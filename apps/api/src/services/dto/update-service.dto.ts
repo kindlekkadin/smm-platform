@@ -8,7 +8,7 @@ import {
   MaxLength,
   MinLength,
 } from 'class-validator';
-import { ServiceCategory, SocialPlatform } from '@prisma/client';
+import { PricingModel, ServiceCategory, SocialPlatform } from '@prisma/client';
 
 export class UpdateServiceDto {
   @IsOptional()
@@ -39,9 +39,20 @@ export class UpdateServiceDto {
   @IsEnum(SocialPlatform)
   platform?: SocialPlatform;
 
+  // Whether this (or the price fields below) is required is determined
+  // against the service's existing pricingModel in the service layer, since
+  // an update is partial and may not resend pricingModel at all.
+  @IsOptional()
+  @IsEnum(PricingModel)
+  pricingModel?: PricingModel;
+
   @IsOptional()
   @IsPositive()
   pricePerThousand?: number;
+
+  @IsOptional()
+  @IsPositive()
+  flatPrice?: number;
 
   @IsOptional()
   @IsInt()

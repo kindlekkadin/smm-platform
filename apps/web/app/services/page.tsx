@@ -77,8 +77,11 @@ function ServiceCard({
         </p>
         <p className="text-sm text-zinc-600 mt-1">{service.description}</p>
         <p className="text-xs text-zinc-500 mt-2">
-          {service.minQuantity.toLocaleString()}–{service.maxQuantity.toLocaleString()} units ·{' '}
-          {service.pricePerThousand} per 1,000
+          {service.minQuantity.toLocaleString()}–{service.maxQuantity.toLocaleString()}{' '}
+          {service.pricingModel === 'FLAT' ? 'packages' : 'units'} ·{' '}
+          {service.pricingModel === 'FLAT'
+            ? `${service.flatPrice} per package`
+            : `${service.pricePerThousand} per 1,000`}
         </p>
       </div>
 

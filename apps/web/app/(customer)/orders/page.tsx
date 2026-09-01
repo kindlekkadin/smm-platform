@@ -64,8 +64,8 @@ export default function OrdersPage() {
       <div className="w-full max-w-2xl space-y-6">
         <div className="flex items-center justify-between">
           <h1 className="text-2xl font-semibold">Your Orders</h1>
-          <Link href="/services" className="text-sm font-medium underline">
-            Browse services
+          <Link href="/orders/new" className="text-sm font-medium underline">
+            New order
           </Link>
         </div>
 
@@ -80,10 +80,10 @@ export default function OrdersPage() {
         {!loading && orders && orders.length === 0 && (
           <p className="text-sm text-zinc-500 border border-dashed border-zinc-300 rounded px-3 py-6 text-center">
             No orders yet.{' '}
-            <Link href="/services" className="underline font-medium">
-              Browse services
-            </Link>{' '}
-            to place one.
+            <Link href="/orders/new" className="underline font-medium">
+              Place your first order
+            </Link>
+            .
           </p>
         )}
 

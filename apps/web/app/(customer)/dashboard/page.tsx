@@ -72,7 +72,8 @@ export default function DashboardPage() {
         </div>
 
         <Section label="Your account">
-          <ActionCard href="/social-accounts" title="Manage social accounts" sub="Connect and review linked accounts" tone="primary" />
+          <ActionCard href="/orders/new" title="New order" sub="Growth services and organic packages" tone="primary" />
+          <ActionCard href="/social-accounts" title="Manage social accounts" sub="Connect and review linked accounts" />
           <ActionCard href="/services" title="Browse services" sub="See what's available to order" />
           <ActionCard href="/orders" title="Your orders" sub="Track status and history" />
         </Section>
