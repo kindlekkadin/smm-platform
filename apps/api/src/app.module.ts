@@ -7,6 +7,7 @@ import { AppController } from './app.controller';
 import { AppService } from './app.service';
 import { PrismaModule } from './prisma/prisma.module';
 import { HealthController } from './health/health.controller';
+import { PublicStatsController } from './public-stats/public-stats.controller';
 import { AuthModule } from './auth/auth.module';
 import { SocialAccountsModule } from './social-accounts/social-accounts.module';
 import { ServicesModule } from './services/services.module';
@@ -56,7 +57,7 @@ import { AnalyticsModule } from './analytics/analytics.module';
     ProvidersModule,
     AnalyticsModule,
   ],
-  controllers: [AppController, HealthController],
+  controllers: [AppController, HealthController, PublicStatsController],
   providers: [AppService, { provide: APP_GUARD, useClass: ThrottlerGuard }],
 })
 export class AppModule {}

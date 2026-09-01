@@ -3,8 +3,8 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import Link from 'next/link';
-import { ApiError } from '../../../lib/api';
-import { useAuth } from '../../../lib/auth-context';
+import { ApiError } from '../../lib/api';
+import { useAuth } from '../../lib/auth-context';
 import {
   EstimateResult,
   Service,
@@ -12,9 +12,11 @@ import {
   ServicePlatform,
   estimatePrice,
   listServices,
-} from '../../../lib/services-api';
-import { SocialAccount, listSocialAccounts } from '../../../lib/social-accounts-api';
-import { createOrder } from '../../../lib/orders-api';
+} from '../../lib/services-api';
+import { SocialAccount, listSocialAccounts } from '../../lib/social-accounts-api';
+import { createOrder } from '../../lib/orders-api';
+import Sidebar from '../../components/Sidebar';
+import PublicHeader from '../../components/PublicHeader';
 
 const PLATFORMS: ServicePlatform[] = ['INSTAGRAM', 'TIKTOK', 'YOUTUBE', 'FACEBOOK', 'X'];
 const CATEGORIES: ServiceCategory[] = [
@@ -29,7 +31,15 @@ const CATEGORIES: ServiceCategory[] = [
   'OTHER',
 ];
 
-function ServiceCard({ service, matchingAccounts }: { service: Service; matchingAccounts: SocialAccount[] }) {
+function ServiceCard({
+  service,
+  isLoggedIn,
+  matchingAccounts,
+}: {
+  service: Service;
+  isLoggedIn: boolean;
+  matchingAccounts: SocialAccount[];
+}) {
   const router = useRouter();
   const [quantity, setQuantity] = useState(service.minQuantity);
   const [estimate, setEstimate] = useState<EstimateResult | null>(null);
@@ -84,57 +94,67 @@ function ServiceCard({ service, matchingAccounts }: { service: Service; matching
         </p>
       </div>
 
-      <div className="mt-3 flex flex-wrap items-end gap-2">
-        <div className="space-y-1">
-          <label className="text-xs font-medium text-muted-foreground">Quantity</label>
-          <input
-            type="number"
-            min={service.minQuantity}
-            max={service.maxQuantity}
-            value={quantity}
-            onChange={(e) => setQuantity(Number(e.target.value))}
-            className="w-28 rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
-          />
-        </div>
-
-        {matchingAccounts.length > 0 && (
+      {isLoggedIn && (
+        <div className="mt-3 flex flex-wrap items-end gap-2">
           <div className="space-y-1">
-            <label className="text-xs font-medium text-muted-foreground">Account</label>
-            <select
-              value={socialAccountId}
-              onChange={(e) => setSocialAccountId(e.target.value)}
-              className="rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
-            >
-              {matchingAccounts.map((account) => (
-                <option key={account.id} value={account.id}>
-                  @{account.username}
-                  {account.platform === 'DEV_MOCK' ? ' (dev mock)' : ''}
-                </option>
-              ))}
-            </select>
+            <label className="text-xs font-medium text-muted-foreground">Quantity</label>
+            <input
+              type="number"
+              min={service.minQuantity}
+              max={service.maxQuantity}
+              value={quantity}
+              onChange={(e) => setQuantity(Number(e.target.value))}
+              className="w-28 rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
+            />
           </div>
-        )}
 
-        <button
-          onClick={() => void handleEstimate()}
-          disabled={estimating}
-          className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
-        >
-          {estimating ? 'Calculating…' : 'Estimate price'}
-        </button>
+          {matchingAccounts.length > 0 && (
+            <div className="space-y-1">
+              <label className="text-xs font-medium text-muted-foreground">Account</label>
+              <select
+                value={socialAccountId}
+                onChange={(e) => setSocialAccountId(e.target.value)}
+                className="rounded-lg border border-border bg-background px-2 py-1.5 text-sm"
+              >
+                {matchingAccounts.map((account) => (
+                  <option key={account.id} value={account.id}>
+                    @{account.username}
+                    {account.platform === 'DEV_MOCK' ? ' (dev mock)' : ''}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
 
-        {matchingAccounts.length > 0 && (
           <button
-            onClick={() => void handleCreateOrder()}
-            disabled={ordering || !socialAccountId}
-            className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-warm hover:brightness-105 disabled:opacity-50"
+            onClick={() => void handleEstimate()}
+            disabled={estimating}
+            className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium hover:bg-muted disabled:opacity-50"
           >
-            {ordering ? 'Placing order…' : 'Order now'}
+            {estimating ? 'Calculating…' : 'Estimate price'}
           </button>
-        )}
-      </div>
 
-      {matchingAccounts.length === 0 && (
+          {matchingAccounts.length > 0 && (
+            <button
+              onClick={() => void handleCreateOrder()}
+              disabled={ordering || !socialAccountId}
+              className="rounded-lg bg-primary px-3 py-1.5 text-xs font-medium text-primary-foreground shadow-warm hover:brightness-105 disabled:opacity-50"
+            >
+              {ordering ? 'Placing order…' : 'Order now'}
+            </button>
+          )}
+        </div>
+      )}
+
+      {!isLoggedIn && (
+        <p className="mt-2 text-xs text-muted-foreground">
+          <Link href="/login" className="font-medium underline">
+            Sign in
+          </Link>{' '}
+          to order this service.
+        </p>
+      )}
+      {isLoggedIn && matchingAccounts.length === 0 && (
         <p className="mt-2 text-xs text-muted-foreground">
           Connect a {service.platform} account to order this.{' '}
           <Link href="/social-accounts" className="font-medium underline">
@@ -153,7 +173,7 @@ function ServiceCard({ service, matchingAccounts }: { service: Service; matching
   );
 }
 
-export default function ServicesPage() {
+function ServicesContent() {
   const { user } = useAuth();
   const [services, setServices] = useState<Service[] | null>(null);
   const [socialAccounts, setSocialAccounts] = useState<SocialAccount[]>([]);
@@ -187,6 +207,10 @@ export default function ServicesPage() {
   }, [load]);
 
   useEffect(() => {
+    if (!user) {
+      setSocialAccounts([]);
+      return;
+    }
     void listSocialAccounts()
       .then(({ accounts }) => setSocialAccounts(accounts))
       .catch(() => setSocialAccounts([]));
@@ -263,6 +287,7 @@ export default function ServicesPage() {
             <ServiceCard
               key={service.id}
               service={service}
+              isLoggedIn={!!user}
               matchingAccounts={socialAccounts.filter(
                 (a) => a.platform === service.platform && a.status === 'ACTIVE',
               )}
@@ -270,6 +295,40 @@ export default function ServicesPage() {
           ))}
         </ul>
       )}
+    </div>
+  );
+}
+
+export default function ServicesPage() {
+  const { user, loading: authLoading } = useAuth();
+
+  if (authLoading) {
+    return (
+      <main className="flex min-h-screen items-center justify-center bg-background">
+        <p className="text-sm text-muted-foreground">Loading…</p>
+      </main>
+    );
+  }
+
+  if (user) {
+    return (
+      <div className="min-h-screen bg-background md:flex">
+        <Sidebar />
+        <main className="flex-1 md:pl-64">
+          <div className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+            <ServicesContent />
+          </div>
+        </main>
+      </div>
+    );
+  }
+
+  return (
+    <div className="min-h-screen bg-background">
+      <PublicHeader />
+      <main className="mx-auto max-w-5xl px-4 py-8 sm:px-6">
+        <ServicesContent />
+      </main>
     </div>
   );
 }
