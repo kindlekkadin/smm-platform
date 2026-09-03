@@ -144,6 +144,7 @@ export default function DashboardPage() {
           <ActionCard href="/admin/creator-offerings" title="Creator offerings" />
           <ActionCard href="/admin/assignments" title="Order assignments" />
           <ActionCard href="/admin/payouts" title="Payout requests" />
+          <ActionCard href="/admin/pending-topups" title="Pending top-ups" />
           <ActionCard href="/admin/providers" title="Providers" />
           <ActionCard href="/admin/provider-mappings" title="Provider mappings" />
           <ActionCard href="/admin/provider-logs" title="Provider dispatch log" />

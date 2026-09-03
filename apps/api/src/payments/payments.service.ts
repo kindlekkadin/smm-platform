@@ -1,6 +1,14 @@
 import { BadRequestException, ForbiddenException, Injectable, NotFoundException } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
-import { OrderStatus, PaymentProvider, PaymentPurpose, PaymentStatus, Prisma, WalletTransactionType } from '@prisma/client';
+import {
+  OrderStatus,
+  PaymentProvider,
+  PaymentPurpose,
+  PaymentStatus,
+  Prisma,
+  WalletTransactionStatus,
+  WalletTransactionType,
+} from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { PaymentProviderRegistry } from './providers/payment-provider-registry';
 
@@ -100,8 +108,9 @@ export class PaymentsService {
   }
 
   async getWalletBalance(userId: string) {
+    // A PENDING (unreviewed) or REJECTED manual top-up must never count.
     const result = await this.prisma.walletTransaction.aggregate({
-      where: { userId },
+      where: { userId, status: WalletTransactionStatus.COMPLETED },
       _sum: { amount: true },
     });
     return result._sum.amount ?? new Prisma.Decimal(0);

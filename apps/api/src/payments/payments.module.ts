@@ -2,7 +2,9 @@ import { Module } from '@nestjs/common';
 import { PaymentsController } from './payments.controller';
 import { PaymentsWebhookController } from './payments-webhook.controller';
 import { AdminPaymentsController } from './admin/admin-payments.controller';
+import { AdminManualTopUpsController } from './admin/admin-manual-topups.controller';
 import { PaymentsService } from './payments.service';
+import { ManualTopUpsService } from './manual-topups.service';
 import {
   PAYMENT_PROVIDERS,
   PaymentProviderRegistry,
@@ -12,9 +14,15 @@ import { PayMongoPaymentProvider } from './providers/paymongo-payment.provider';
 import { PaymentProviderAdapter } from './providers/payment-provider.interface';
 
 @Module({
-  controllers: [PaymentsController, PaymentsWebhookController, AdminPaymentsController],
+  controllers: [
+    PaymentsController,
+    PaymentsWebhookController,
+    AdminPaymentsController,
+    AdminManualTopUpsController,
+  ],
   providers: [
     PaymentsService,
+    ManualTopUpsService,
     PaymentProviderRegistry,
     DevMockPaymentProvider,
     PayMongoPaymentProvider,

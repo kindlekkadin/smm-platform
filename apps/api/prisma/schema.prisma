@@ -262,7 +262,19 @@ model Payment {
 // but nothing spends from this balance yet (orders are still paid
 // individually) — see the Add Funds page copy for the honest disclosure.
 enum WalletTransactionType {
+  // Auto-credited the moment a gateway webhook (DEV_MOCK/PayMongo) reports
+  // success — see PaymentsService.handleWebhook. Always created COMPLETED.
   TOP_UP
+  // Submitted by a customer after a manual bank/QR Ph transfer, with their
+  // own reference number. Always created PENDING — only counts toward
+  // balance once an admin reviews and approves it.
+  MANUAL_TOP_UP
+}
+
+enum WalletTransactionStatus {
+  PENDING
+  COMPLETED
+  REJECTED
 }
 
 model WalletTransaction {
@@ -272,15 +284,48 @@ model WalletTransaction {
   type   WalletTransactionType
   amount Decimal               @db.Decimal(10, 2)
 
-  // The Payment that produced this credit. One-to-one and unique so a
-  // replayed webhook can never double-credit — the DB itself rejects it,
-  // on top of PaymentsService's own PENDING-status idempotency guard.
+  // Balance is SUM(amount) WHERE status = COMPLETED — a PENDING or REJECTED
+  // manual submission never counts. Defaults to COMPLETED so existing
+  // gateway-credited TOP_UP rows (created before this field existed) stay
+  // exactly as they were.
+  status WalletTransactionStatus @default(COMPLETED)
+
+  // The Payment that produced this credit — only ever set for TOP_UP.
+  // One-to-one and unique so a replayed webhook can never double-credit —
+  // the DB itself rejects it, on top of PaymentsService's own
+  // PENDING-status idempotency guard.
   paymentId String?  @unique
   payment   Payment? @relation(fields: [paymentId], references: [id])
+
+  // Only ever set for MANUAL_TOP_UP — the customer's own bank/GCash/QR Ph
+  // transfer reference, submitted for an admin to match against what
+  // actually arrived before approving.
+  referenceNumber String?
+
+  reviewedByAdminId String?
+  reviewedAt        DateTime?
+  rejectionReason   String?
 
   createdAt DateTime @default(now())
 
   @@index([userId])
+  @@index([type])
+  @@index([status])
+}
+
+// Singleton row (fixed id "singleton") holding the receiving account/QR
+// details for manual top-ups. Admin-editable, and intentionally starts
+// empty — nothing here is ever a fabricated placeholder account. The Add
+// Funds page shows an honest "not configured yet" state until an admin
+// fills in real details.
+model ManualTopUpSettings {
+  id            String   @id
+  qrPhImageUrl  String?
+  accountName   String?
+  accountNumber String?
+  bankName      String?
+  instructions  String?
+  updatedAt     DateTime @updatedAt
 }
 
 // ---- Phase 6: Creator Marketplace ----
