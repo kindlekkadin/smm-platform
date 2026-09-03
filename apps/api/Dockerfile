@@ -33,8 +33,15 @@ FROM base AS runtime
 ENV NODE_ENV=production
 WORKDIR /app
 COPY --from=build /deploy/api ./
+# Explicit, regardless of what pnpm's deploy packing already included —
+# `prisma migrate deploy` at boot (see start:prod below) needs schema.prisma
+# and the full migrations/ history physically present in this image.
+COPY --from=build /repo/apps/api/prisma ./prisma
 EXPOSE 3001
-# migrate deploy (not `migrate dev`) — applies pending migrations without
-# ever prompting or generating a new one. Safe to run on every boot: a
-# no-op when the schema is already up to date.
-CMD ["sh", "-c", "node_modules/.bin/prisma migrate deploy && node dist/main.js"]
+# Render's free-tier Docker instances don't support a native Pre-Deploy
+# Command, so the migration runs on container boot instead, via the
+# start:prod script (`prisma migrate deploy && node dist/main.js`) in
+# package.json. `migrate deploy` (not `migrate dev`) applies pending
+# migrations without ever prompting or generating a new one — safe to run
+# on every boot, a no-op when the schema is already up to date.
+CMD ["npm", "run", "start:prod"]
