@@ -2,10 +2,17 @@ import { BadRequestException, Injectable, NotFoundException } from '@nestjs/comm
 import { Prisma, WalletTransactionStatus, WalletTransactionType } from '@prisma/client';
 import { PrismaService } from '../prisma/prisma.service';
 import { UpdateManualTopUpSettingsDto } from './dto/update-manual-topup-settings.dto';
+import { MIN_MANUAL_TOP_UP_AMOUNT } from './dto/submit-manual-topup.dto';
 
 // Mirrors the gateway top-up cap — see PaymentsService. Just a sanity bound,
 // not a real business limit (there's still nothing to spend a balance on).
 const MAX_TOP_UP_AMOUNT = 100_000;
+
+// Only the last 6 digits of the transfer's reference number, not the full
+// reference — matches SubmitManualTopUpDto's validation. Re-checked here
+// too (not just at the DTO boundary) so this stays true even if submit() is
+// ever called from somewhere other than the HTTP controller.
+const REFERENCE_NUMBER_PATTERN = /^\d{6}$/;
 
 const SETTINGS_ID = 'singleton';
 
@@ -17,12 +24,14 @@ export class ManualTopUpsService {
     if (!Number.isFinite(amount) || amount <= 0) {
       throw new BadRequestException('Amount must be a positive number');
     }
+    if (amount < MIN_MANUAL_TOP_UP_AMOUNT) {
+      throw new BadRequestException(`Minimum top-up is ${MIN_MANUAL_TOP_UP_AMOUNT}`);
+    }
     if (amount > MAX_TOP_UP_AMOUNT) {
       throw new BadRequestException(`Amount exceeds the maximum allowed top-up of ${MAX_TOP_UP_AMOUNT}`);
     }
-    const trimmedRef = referenceNumber.trim();
-    if (!trimmedRef) {
-      throw new BadRequestException('A payment reference number is required');
+    if (!REFERENCE_NUMBER_PATTERN.test(referenceNumber)) {
+      throw new BadRequestException('Reference number must be exactly the last 6 digits, digits only');
     }
 
     return this.prisma.walletTransaction.create({
@@ -31,7 +40,7 @@ export class ManualTopUpsService {
         type: WalletTransactionType.MANUAL_TOP_UP,
         amount: new Prisma.Decimal(amount).toDecimalPlaces(2),
         status: WalletTransactionStatus.PENDING,
-        referenceNumber: trimmedRef,
+        referenceNumber,
       },
     });
   }

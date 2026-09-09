@@ -10,6 +10,11 @@ import {
   submitManualTopUp,
 } from '../../../lib/payments-api';
 
+// Matches MIN_MANUAL_TOP_UP_AMOUNT in the backend's submit-manual-topup.dto.ts —
+// kept as a plain literal here since the frontend and backend are separate
+// packages with no shared constants module.
+const MIN_TOP_UP_AMOUNT = 15;
+
 const STATUS_STYLES: Record<string, string> = {
   PENDING: 'bg-yellow-50 text-yellow-800 border-yellow-200',
   COMPLETED: 'bg-green-50 text-green-800 border-green-200',
@@ -60,13 +65,17 @@ export default function AddFundsPage() {
       setError('Enter a valid amount.');
       return;
     }
-    if (!referenceNumber.trim()) {
-      setError('Enter the payment reference number from your transfer.');
+    if (value < MIN_TOP_UP_AMOUNT) {
+      setError(`Minimum top-up: ₱${MIN_TOP_UP_AMOUNT}`);
+      return;
+    }
+    if (!/^\d{6}$/.test(referenceNumber)) {
+      setError('Enter the last 6 digits of your reference number.');
       return;
     }
     setSubmitting(true);
     try {
-      await submitManualTopUp(value, referenceNumber.trim());
+      await submitManualTopUp(value, referenceNumber);
       setAmount('');
       setReferenceNumber('');
       setSubmitted(true);
@@ -142,28 +151,41 @@ export default function AddFundsPage() {
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="space-y-3 rounded-xl border border-border bg-card p-5 shadow-warm">
+      <form
+        onSubmit={handleSubmit}
+        noValidate
+        className="space-y-3 rounded-xl border border-border bg-card p-5 shadow-warm"
+      >
         <p className="text-sm font-semibold">Submit your top-up</p>
         <div className="space-y-1">
           <label className="text-xs font-medium text-muted-foreground">Amount sent</label>
           <input
             type="number"
-            min="1"
+            min={MIN_TOP_UP_AMOUNT}
             step="0.01"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
             className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
           />
+          <p className="text-[11px] text-muted-foreground">Minimum top-up: ₱{MIN_TOP_UP_AMOUNT}</p>
         </div>
         <div className="space-y-1">
-          <label className="text-xs font-medium text-muted-foreground">Payment reference number</label>
+          <label className="text-xs font-medium text-muted-foreground">
+            Enter the last 6 digits of your reference number
+          </label>
           <input
             type="text"
+            inputMode="numeric"
+            pattern="\d{6}"
+            maxLength={6}
             value={referenceNumber}
-            onChange={(e) => setReferenceNumber(e.target.value)}
-            placeholder="From your bank / GCash / Maya transfer receipt"
+            onChange={(e) => setReferenceNumber(e.target.value.replace(/\D/g, '').slice(0, 6))}
+            placeholder="e.g. 123456"
             className="w-full rounded-xl border border-border bg-background px-3 py-2 text-sm"
           />
+          <p className="text-[11px] text-muted-foreground">
+            Just the last 6 digits — not the full reference number from your receipt.
+          </p>
         </div>
 
         {error && <p className="text-xs text-red-600">{error}</p>}

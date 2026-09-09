@@ -22,6 +22,12 @@ describe('Manual Top-Ups (e2e)', () => {
   let ownerAgent: ReturnType<typeof request.agent>;
   let otherAgent: ReturnType<typeof request.agent>;
 
+  // This is a genuinely shared singleton row — a real admin may have already
+  // configured real receiving-account details in this environment before
+  // this suite ever runs. Snapshot it so afterAll can put it back exactly as
+  // found, instead of unconditionally wiping out someone's real config.
+  let preExistingSettings: Awaited<ReturnType<PrismaService['manualTopUpSettings']['findUnique']>>;
+
   beforeAll(async () => {
     const moduleFixture: TestingModule = await Test.createTestingModule({
       imports: [AppModule],
@@ -60,13 +66,26 @@ describe('Manual Top-Ups (e2e)', () => {
       .send({ email: otherEmail, password, displayName: 'Manual Top-Up Other' })
       .expect(201);
     await otherAgent.post('/api/auth/login').send({ email: otherEmail, password }).expect(200);
+
+    // Snapshot, then clear — the "settings" describe block below needs a
+    // guaranteed-unconfigured starting point to test that state honestly.
+    preExistingSettings = await prisma.manualTopUpSettings.findUnique({ where: { id: 'singleton' } });
+    await prisma.manualTopUpSettings.deleteMany({});
   });
 
   afterAll(async () => {
     await prisma.walletTransaction.deleteMany({
       where: { user: { email: { in: [ownerEmail, otherEmail] } } },
     });
-    await prisma.manualTopUpSettings.deleteMany({});
+    if (preExistingSettings) {
+      await prisma.manualTopUpSettings.upsert({
+        where: { id: 'singleton' },
+        create: preExistingSettings,
+        update: preExistingSettings,
+      });
+    } else {
+      await prisma.manualTopUpSettings.deleteMany({});
+    }
     await prisma.user.deleteMany({ where: { email: { in: [adminEmail, ownerEmail, otherEmail] } } });
     await app.close();
   });
@@ -105,15 +124,34 @@ describe('Manual Top-Ups (e2e)', () => {
     it('rejects an unauthenticated request', async () => {
       await request(app.getHttpServer())
         .post('/api/wallet/manual-top-up')
-        .send({ amount: 50, referenceNumber: 'REF123' })
+        .send({ amount: 50, referenceNumber: '123456' })
         .expect(401);
     });
 
     it('rejects a non-positive amount', async () => {
       await ownerAgent
         .post('/api/wallet/manual-top-up')
-        .send({ amount: 0, referenceNumber: 'REF123' })
+        .send({ amount: 0, referenceNumber: '123456' })
         .expect(400);
+    });
+
+    it('rejects an amount below the ₱15 minimum', async () => {
+      await ownerAgent
+        .post('/api/wallet/manual-top-up')
+        .send({ amount: 14.99, referenceNumber: '123456' })
+        .expect(400);
+      await ownerAgent
+        .post('/api/wallet/manual-top-up')
+        .send({ amount: 1, referenceNumber: '123456' })
+        .expect(400);
+    });
+
+    it('accepts an amount at exactly the ₱15 minimum', async () => {
+      const res = await ownerAgent
+        .post('/api/wallet/manual-top-up')
+        .send({ amount: 15, referenceNumber: '150000' })
+        .expect(201);
+      expect(res.body.transaction.amount).toBe('15');
     });
 
     it('rejects a missing/blank reference number', async () => {
@@ -124,15 +162,39 @@ describe('Manual Top-Ups (e2e)', () => {
         .expect(400);
     });
 
+    it('rejects a reference number that is not exactly 6 digits', async () => {
+      // Too short
+      await ownerAgent
+        .post('/api/wallet/manual-top-up')
+        .send({ amount: 50, referenceNumber: '12345' })
+        .expect(400);
+      // Too long
+      await ownerAgent
+        .post('/api/wallet/manual-top-up')
+        .send({ amount: 50, referenceNumber: '1234567' })
+        .expect(400);
+      // Non-digit characters, including the kind of full alphanumeric
+      // reference a real receipt might show — only the last 6 digits are
+      // ever accepted, not the full reference.
+      await ownerAgent
+        .post('/api/wallet/manual-top-up')
+        .send({ amount: 50, referenceNumber: 'GCASH-REF-001' })
+        .expect(400);
+      await ownerAgent
+        .post('/api/wallet/manual-top-up')
+        .send({ amount: 50, referenceNumber: '12345a' })
+        .expect(400);
+    });
+
     it('creates a PENDING wallet transaction that does not yet affect the balance', async () => {
       const res = await ownerAgent
         .post('/api/wallet/manual-top-up')
-        .send({ amount: 50, referenceNumber: 'GCASH-REF-001' })
+        .send({ amount: 50, referenceNumber: '123456' })
         .expect(201);
 
       expect(res.body.transaction.status).toBe('PENDING');
       expect(res.body.transaction.type).toBe('MANUAL_TOP_UP');
-      expect(res.body.transaction.referenceNumber).toBe('GCASH-REF-001');
+      expect(res.body.transaction.referenceNumber).toBe('123456');
 
       const walletRes = await ownerAgent.get('/api/wallet').expect(200);
       expect(walletRes.body.balance).toBe('0');
@@ -147,14 +209,14 @@ describe('Manual Top-Ups (e2e)', () => {
     it('lists the pending request for an admin', async () => {
       const res = await adminAgent.get('/api/admin/manual-top-ups').expect(200);
       expect(
-        res.body.transactions.some((t: { referenceNumber: string }) => t.referenceNumber === 'GCASH-REF-001'),
+        res.body.transactions.some((t: { referenceNumber: string }) => t.referenceNumber === '123456'),
       ).toBe(true);
     });
 
     it('rejects a non-admin from approving', async () => {
       const submitRes = await otherAgent
         .post('/api/wallet/manual-top-up')
-        .send({ amount: 10, referenceNumber: 'OTHER-REF-1' })
+        .send({ amount: 20, referenceNumber: '223456' })
         .expect(201);
 
       await ownerAgent
@@ -165,7 +227,7 @@ describe('Manual Top-Ups (e2e)', () => {
     it('approving atomically credits the balance, and a second approval fails', async () => {
       const submitRes = await otherAgent
         .post('/api/wallet/manual-top-up')
-        .send({ amount: 30, referenceNumber: 'OTHER-REF-2' })
+        .send({ amount: 30, referenceNumber: '323456' })
         .expect(201);
 
       const approveRes = await adminAgent
@@ -187,7 +249,7 @@ describe('Manual Top-Ups (e2e)', () => {
 
       const submitRes = await otherAgent
         .post('/api/wallet/manual-top-up')
-        .send({ amount: 999, referenceNumber: 'OTHER-REF-REJECT' })
+        .send({ amount: 999, referenceNumber: '423456' })
         .expect(201);
 
       const rejectRes = await adminAgent
