@@ -1,6 +1,12 @@
+'use client';
+
 import Link from 'next/link';
+import { useAuth } from '../lib/auth-context';
 
 export default function PublicHeader() {
+  const { user } = useAuth();
+  const isAdmin = user?.role === 'ADMIN';
+
   return (
     <header className="sticky top-0 z-20 border-b border-border bg-card/90 backdrop-blur">
       <div className="mx-auto flex max-w-6xl items-center justify-between px-4 py-3 sm:px-6">
@@ -18,6 +24,14 @@ export default function PublicHeader() {
           <Link href="/api-access" className="rounded-lg px-3 py-2 text-foreground hover:bg-muted">
             API
           </Link>
+          {isAdmin && (
+            <Link
+              href="/admin/pending-topups"
+              className="rounded-lg border border-amber-300 bg-amber-50 px-3 py-2 text-amber-900 hover:bg-amber-100"
+            >
+              Admin Panel
+            </Link>
+          )}
           <Link href="/login" className="rounded-lg px-3 py-2 text-foreground hover:bg-muted">
             Sign In
           </Link>

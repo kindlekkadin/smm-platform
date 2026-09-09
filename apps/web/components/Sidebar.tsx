@@ -118,6 +118,26 @@ function SidebarContent({ onNavigate }: { onNavigate?: () => void }) {
         <span>Hayathmanager</span>
       </Link>
 
+      {user?.role === 'ADMIN' && (
+        <div className="px-3 pb-1">
+          <Link
+            href="/admin/pending-topups"
+            onClick={onNavigate}
+            className="flex items-center gap-2 rounded-xl border border-amber-300 bg-amber-50 px-3 py-2.5 text-sm font-semibold text-amber-900 shadow-warm transition-colors hover:bg-amber-100"
+          >
+            <svg viewBox="0 0 24 24" fill="none" className="h-4 w-4 shrink-0">
+              <path
+                d="M12 3l7 3v6c0 4.5-3 7.5-7 9-4-1.5-7-4.5-7-9V6l7-3z"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinejoin="round"
+              />
+            </svg>
+            Admin Panel
+          </Link>
+        </div>
+      )}
+
       <nav className="flex-1 space-y-1 px-3">
         {NAV_ITEMS.map((item) => {
           const active = item.isActive(pathname);
